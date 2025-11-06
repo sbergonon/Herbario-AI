@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PlantInfo, GroundingSource, HistoryEntry, Preparation, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from './types';
-import { identifyPlantFromImage, identifyPlantFromText, diagnosePlantDiseaseFromImage, comparePlants, findPlantsByUsage, generateCareGuide } from './services/geminiService';
+import { identifyPlantFromImage, identifyPlantFromText, diagnosePlantDiseaseFromImage, comparePlants, findPlantsByUsage, generateCareGuide, findLocalPlants } from './services/geminiService';
 import { Icon } from './components/Icons';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ManualModal } from './components/ManualModal';
@@ -10,7 +10,7 @@ import { useApiKey } from './contexts/ApiKeyContext';
 import { useLanguage } from './contexts/LanguageContext';
 
 declare global {
-  interface Window { jspdf: any; }
+  interface Window { jspdf: any; html2canvas: any; }
 }
 
 // Helper for haptic feedback on supported devices
@@ -26,7 +26,7 @@ const triggerHapticFeedback = (pattern: number | number[] = 50) => {
 };
 
 
-type MainMode = 'identify' | 'diagnose' | 'remedy';
+type MainMode = 'identify' | 'diagnose' | 'remedy' | 'discover';
 type AppView = 'main' | 'comparator';
 
 const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -173,13 +173,14 @@ const MainInput: React.FC<{ onImageSelect: (file: File) => void; isLoading: bool
     identify: { icon: 'leaf', titleKey: 'appName', buttonTextKey: 'identifyPlant', descriptionKey: 'identifyPlantTitle' },
     diagnose: { icon: 'bug', titleKey: 'diseaseDiagnostic', buttonTextKey: 'diagnosePlant', descriptionKey: 'diagnosePlantTitle' },
     remedy: { icon: 'mortar-pestle', titleKey: 'findRemedy', buttonTextKey: 'findRemedy', descriptionKey: 'remedySearchTitle' },
+    discover: { icon: 'compass', titleKey: 'discoverTitle', buttonTextKey: 'discover', descriptionKey: 'discoverDescription' },
   };
 
   return (
     <div className="w-full max-w-md p-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-green-200 dark:border-emerald-700 text-center">
       <div className="flex w-full bg-green-100 dark:bg-slate-700 rounded-full p-1 mb-6 transition-colors">
         {Object.entries(modeConfig).map(([key, config]) => (
-          <button key={key} onClick={() => { onModeChange(key as MainMode); triggerHapticFeedback(); }} className={`w-1/3 py-2 px-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${mode === key ? 'bg-white dark:bg-slate-800 shadow text-green-800 dark:text-emerald-200' : 'text-green-700 dark:text-slate-300'}`}>
+          <button key={key} onClick={() => { onModeChange(key as MainMode); triggerHapticFeedback(); }} className={`w-1/4 py-2 px-1 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${mode === key ? 'bg-white dark:bg-slate-800 shadow text-green-800 dark:text-emerald-200' : 'text-green-700 dark:text-slate-300'}`}>
             <Icon name={config.icon} className="w-5 h-5" />
             {t(config.buttonTextKey)}
           </button>
@@ -238,6 +239,67 @@ const Loader: React.FC<{ message: string, subMessage: string }> = ({ message, su
     </div>
 );
 
+const ToxicityMeter: React.FC<{ level: ToxicityInfo['nivelToxicidad'] }> = ({ level }) => {
+    const { t } = useLanguage();
+    const levels = ['None', 'Low', 'Medium', 'High', 'Lethal'];
+    const levelIndex = levels.indexOf(level);
+    const config = {
+      None: { text: t('toxicityLevel_None'), color: 'bg-green-500', barColor: 'bg-green-200 dark:bg-green-800' },
+      Low: { text: t('toxicityLevel_Low'), color: 'bg-yellow-500', barColor: 'bg-yellow-200 dark:bg-yellow-800' },
+      Medium: { text: t('toxicityLevel_Medium'), color: 'bg-orange-500', barColor: 'bg-orange-200 dark:bg-orange-800' },
+      High: { text: t('toxicityLevel_High'), color: 'bg-red-500', barColor: 'bg-red-200 dark:bg-red-800' },
+      Lethal: { text: t('toxicityLevel_Lethal'), color: 'bg-purple-600', barColor: 'bg-purple-200 dark:bg-purple-800' },
+    };
+    const { text, color, barColor } = config[level] || config.Low;
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-semibold text-gray-700 dark:text-slate-300">{t('toxicityLevel')}</span>
+                <span className={`text-sm font-bold ${color.replace('bg-', 'text-')}`}>{text}</span>
+            </div>
+            <div className={`w-full h-2.5 rounded-full flex overflow-hidden ${barColor}`}>
+                {levels.map((l, i) => (
+                    <div key={l} className={`w-1/5 h-full ${i <= levelIndex ? color : ''}`}></div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+interface ShareableCardProps {
+  plantInfo: PlantInfo;
+  imageSrc: string;
+  onRef: (node: HTMLDivElement | null) => void;
+}
+
+const ShareableCard: React.FC<ShareableCardProps> = ({ plantInfo, imageSrc, onRef }) => {
+    const { t } = useLanguage();
+    return (
+        <div ref={onRef} className="w-[400px] bg-white dark:bg-slate-800 font-sans shadow-2xl rounded-lg overflow-hidden border border-green-200 dark:border-emerald-700">
+            <img src={imageSrc} alt={plantInfo.nombreComun} className="w-full h-52 object-cover" />
+            <div className="p-5">
+                <h2 className="text-2xl font-extrabold text-green-800 dark:text-emerald-200">{plantInfo.nombreComun}</h2>
+                <p className="text-md text-gray-500 dark:text-slate-400 italic mb-3">{plantInfo.nombreCientifico}</p>
+                <div className="mb-4">
+                  <ToxicityMeter level={plantInfo.toxicidad.nivelToxicidad} />
+                </div>
+                {plantInfo.usosMedicinales && plantInfo.usosMedicinales.length > 0 && (
+                    <>
+                        <h3 className="font-bold text-lg text-green-900 dark:text-emerald-300 mb-2">{t('medicinalUses')}</h3>
+                        <ul className="list-disc list-inside text-sm text-gray-700 dark:text-slate-300 space-y-1">
+                            {plantInfo.usosMedicinales.slice(0, 3).map((use, i) => <li key={i}>{use}</li>)}
+                        </ul>
+                    </>
+                )}
+            </div>
+            <div className="px-5 py-3 bg-green-50 dark:bg-slate-900/50 flex items-center justify-between text-xs text-green-800 dark:text-emerald-400">
+                <span className="font-bold">Herbario IA</span>
+                <Icon name="leaf" className="w-4 h-4" />
+            </div>
+        </div>
+    );
+};
+
 interface ResultCardProps { 
     result: HistoryEntry; 
     onReset: () => void; 
@@ -252,7 +314,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
     const { plantInfo, sources, imageSrc, mapaDistribucionSrc, careGuide, imageGenerationFailed } = result;
     const { t } = useLanguage();
     const resultCardRef = useRef<HTMLDivElement>(null);
+    const shareableCardRef = useRef<HTMLDivElement | null>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
+    const [showShareableCard, setShowShareableCard] = useState(false);
 
     if (!plantInfo) return null;
 
@@ -269,6 +334,47 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
             else { await navigator.clipboard.writeText(shareText); setSharedPrep(prep.nombre); setTimeout(() => setSharedPrep(null), 2500); }
         } catch (err) {
             try { await navigator.clipboard.writeText(shareText); setSharedPrep(prep.nombre); setTimeout(() => setSharedPrep(null), 2500); } catch (clipErr) { alert('Could not share or copy preparation.'); }
+        }
+    };
+    
+    const handleShareAsImage = async () => {
+        if (!shareableCardRef.current) {
+            setShowShareableCard(true);
+            // Wait for the next render cycle for the ref to be populated
+            setTimeout(handleShareAsImage, 100);
+            return;
+        }
+        setIsSharing(true);
+        triggerHapticFeedback();
+
+        try {
+            const canvas = await window.html2canvas(shareableCardRef.current, { useCORS: true, backgroundColor: null });
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    alert('Could not generate image.');
+                    setIsSharing(false);
+                    return;
+                }
+                const file = new File([blob], `${plantInfo.nombreComun}.png`, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: plantInfo.nombreComun,
+                        text: `${t('checkOutPlant')} ${plantInfo.nombreComun} - ${t('identifiedWith')} Herbario IA`,
+                    });
+                } else {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `${plantInfo.nombreComun.replace(/ /g, '_')}.png`;
+                    link.click();
+                }
+            }, 'image/png');
+        } catch (error) {
+            console.error('Sharing failed:', error);
+            alert('Could not share image.');
+        } finally {
+            setIsSharing(false);
+            setShowShareableCard(false);
         }
     };
 
@@ -344,6 +450,12 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
     };
   
   return (
+    <>
+    {showShareableCard && (
+        <div className="fixed top-0 left-[-9999px]" aria-hidden="true">
+            <ShareableCard plantInfo={plantInfo} imageSrc={imageSrc} onRef={(node) => shareableCardRef.current = node} />
+        </div>
+    )}
     <div ref={resultCardRef} className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden my-8 border border-green-200 dark:border-emerald-800">
         <div className="p-6 md:p-8">
             <div className="md:flex md:gap-8">
@@ -365,6 +477,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
                             {plantInfo.sinonimos?.length > 0 && <p className="text-sm text-gray-600 dark:text-slate-300 mt-2 break-words"><strong>{t('alsoKnownAs')}:</strong> {plantInfo.sinonimos.join(', ')}</p>}
                         </div>
                          <div className="flex-shrink-0 ml-4 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                            <button onClick={handleShareAsImage} disabled={isSharing} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
+                                {isSharing ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="share-up" className="w-4 h-4" />}
+                                {isSharing ? t('sharing') : t('share')}
+                            </button>
                             {onStartCompare && (<button onClick={() => { onStartCompare(); triggerHapticFeedback(); }} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"><Icon name="compare" className="w-4 h-4" />{t('compare')}</button>)}
                             <button onClick={onToggleHerbarium} className={`hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${ isInHerbarium ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-500 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600' }`}><Icon name="bookmark" className="w-4 h-4" />{isInHerbarium ? t('saved') : t('save')}</button>
                             <button onClick={handleExportPdf} disabled={isExporting} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
@@ -372,6 +488,9 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
                                 {isExporting ? t('exporting') : t('exportToPdf')}
                             </button>
                         </div>
+                    </div>
+                    <div className="mt-4">
+                      <ToxicityMeter level={plantInfo.toxicidad.nivelToxicidad} />
                     </div>
                     <p className="text-gray-700 dark:text-slate-300 leading-relaxed mt-4 break-words">{plantInfo.descripcionGeneral}</p>
                     <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
@@ -524,6 +643,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
         </div>
         <div className="p-6 bg-gray-50 dark:bg-slate-900/50 text-center"><button onClick={() => { onReset(); triggerHapticFeedback(); }} className="hide-on-export px-8 py-3 bg-green-600 dark:bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 dark:hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-transform transform hover:scale-105">{t('anotherQuery')}</button></div>
     </div>
+    </>
   );
 };
 
@@ -673,6 +793,118 @@ const SuggestedPlantsList: React.FC<{ suggestions: SuggestedPlant[]; query: stri
   );
 };
 
+const DiscoveryView: React.FC<{ onSelectPlant: (plantName: string) => void; onSelectCategory: (category: string) => void; }> = ({ onSelectPlant, onSelectCategory }) => {
+    const { t, language } = useLanguage();
+    const { effectiveApiKey } = useApiKey();
+    const [plantOfTheDay, setPlantOfTheDay] = useState('');
+    const [localPlants, setLocalPlants] = useState<SuggestedPlant[] | null>(null);
+    const [localPlantsStatus, setLocalPlantsStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+    const [localPlantsMessage, setLocalPlantsMessage] = useState('');
+    
+    useEffect(() => {
+        const today = new Date().toDateString();
+        const storedDate = localStorage.getItem('plantOfTheDayDate');
+        const storedPlant = localStorage.getItem('plantOfTheDay');
+        if (storedDate === today && storedPlant) {
+            setPlantOfTheDay(storedPlant);
+        } else {
+            const plants = ['Manzanilla', 'Lavanda', 'Menta', 'Romero', 'Diente de León', 'Ortiga', 'Caléndula', 'Aloe Vera', 'Ginseng', 'Equinácea'];
+            const randomPlant = plants[Math.floor(Math.random() * plants.length)];
+            setPlantOfTheDay(randomPlant);
+            localStorage.setItem('plantOfTheDay', randomPlant);
+            localStorage.setItem('plantOfTheDayDate', today);
+        }
+    }, []);
+
+    const categories = useMemo(() => [
+        { key: 'category_relaxation', icon: 'sparkles', value: language === 'es' ? 'Relajación y Estrés' : 'Relaxation & Stress', query: language === 'es' ? 'Estrés o ansiedad' : 'Stress or anxiety' },
+        { key: 'category_digestion', icon: 'leaf', value: language === 'es' ? 'Salud Digestiva' : 'Digestive Health', query: language === 'es' ? 'indigestión' : 'indigestion' },
+        { key: 'category_skin', icon: 'shield', value: language === 'es' ? 'Cuidado de la Piel' : 'Skin Care', query: language === 'es' ? 'irritación de la piel' : 'skin irritation' },
+        { key: 'category_first_aid', icon: 'cross', value: language === 'es' ? 'Primeros Auxilios' : 'First Aid', query: language === 'es' ? 'cortes o quemaduras leves' : 'minor cuts or burns' },
+    ], [language]);
+
+    const getLocation = (): Promise<{ latitude: number; longitude: number }> => new Promise((resolve, reject) => { 
+        if (!navigator.geolocation) { reject(new Error("Geolocation not supported.")); return; }
+        navigator.geolocation.getCurrentPosition(
+            (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+            (error) => reject(error),
+            { timeout: 10000 }
+        );
+    });
+
+    const handleFindLocalPlants = async () => {
+        triggerHapticFeedback();
+        setLocalPlantsStatus('loading');
+        setLocalPlantsMessage(t('gettingLocation'));
+        try {
+            const location = await getLocation();
+            setLocalPlantsMessage(t('findingPlants'));
+            const plants = await findLocalPlants(effectiveApiKey!, location, language);
+            setLocalPlants(plants);
+            setLocalPlantsStatus('idle');
+        } catch (err: any) {
+            console.error(err);
+            setLocalPlantsStatus('error');
+            setLocalPlantsMessage(err.code === 1 ? t('locationPermissionDenied') : t('unexpectedError'));
+        }
+    };
+
+    return (
+        <div className="w-full max-w-md p-6 sm:p-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-green-200 dark:border-emerald-700">
+            <h2 className="text-2xl font-bold text-center text-green-900 dark:text-emerald-200 mb-6">{t('discoverTitle')}</h2>
+            
+            <div className="mb-8">
+                <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 mb-3">{t('plantOfTheDay')}</h3>
+                <button onClick={() => { onSelectPlant(plantOfTheDay); triggerHapticFeedback(); }} className="w-full p-4 bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900 dark:to-green-900 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105 text-left">
+                    <p className="text-2xl font-bold text-green-800 dark:text-emerald-200">{plantOfTheDay}</p>
+                </button>
+            </div>
+
+            <div className="mb-8">
+                <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 mb-3">{t('exploreCategories')}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {categories.map(cat => (
+                        <button key={cat.key} onClick={() => { onSelectCategory(cat.query); triggerHapticFeedback(); }} className="p-3 bg-green-50 dark:bg-emerald-900/50 rounded-lg shadow-sm hover:shadow-md hover:bg-green-100 dark:hover:bg-emerald-900/80 transition-all flex items-center gap-3">
+                            <Icon name={cat.icon} className="w-6 h-6 text-green-600 dark:text-emerald-400 flex-shrink-0" />
+                            <span className="font-semibold text-sm text-green-800 dark:text-emerald-300">{cat.value}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 mb-3">{t('plantsNearYou')}</h3>
+                {localPlantsStatus === 'idle' && !localPlants && (
+                    <button onClick={handleFindLocalPlants} className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                        <Icon name="globe" className="w-5 h-5" />
+                        {t('findLocalPlantsButton')}
+                    </button>
+                )}
+                {localPlantsStatus === 'loading' && (
+                    <div className="text-center p-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                        <p className="text-blue-700 dark:text-blue-300">{localPlantsMessage}</p>
+                    </div>
+                )}
+                 {localPlantsStatus === 'error' && <p className="text-center p-4 text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 rounded-lg">{localPlantsMessage}</p>}
+                 {localPlants && (
+                    <ul className="space-y-3 text-left">
+                        {localPlants.map((plant, index) => (
+                            <li key={index}>
+                                <button onClick={() => { onSelectPlant(plant.nombreComun); triggerHapticFeedback(); }} className="w-full p-3 bg-blue-50 dark:bg-blue-900/40 rounded-lg shadow-sm hover:shadow-md hover:bg-blue-100 dark:hover:bg-blue-900/80 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500 transition-all">
+                                    <h4 className="font-bold text-md text-blue-800 dark:text-blue-300">{plant.nombreComun}</h4>
+                                    <p className="text-xs text-blue-700 dark:text-blue-400">{plant.relevancia}</p>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                 )}
+            </div>
+        </div>
+    );
+};
+
+
 // --- MAIN APP COMPONENT ---
 
 function App() {
@@ -730,7 +962,22 @@ function App() {
 
   const saveHistory = (newHistory: HistoryEntry[]) => { const sorted = newHistory.sort((a, b) => b.timestamp - a.timestamp); setHistory(sorted); localStorage.setItem('plantHistory', JSON.stringify(sorted)); };
   const saveHerbarium = (newHerbarium: HistoryEntry[]) => { setHerbarium(newHerbarium); localStorage.setItem('plantHerbarium', JSON.stringify(newHerbarium)); };
-  const handleImageSelect = useCallback((file: File) => { handleReset(); const src = URL.createObjectURL(file); setImage({ file, src, mimeType: file.type }); }, []);
+  
+  const handleReset = useCallback(() => { 
+    setImage(null); 
+    setCurrentResult(null); 
+    setError(null); 
+    setIsLoading(false); 
+    setIsTextSearching(false); 
+    setView('main'); 
+    setComparisonPlants({ plantA: null, plantB: null }); 
+    setComparisonResult(null); 
+    setSuggestedPlants(null); 
+    setRemedyQuery(''); 
+    setMainMode('identify');
+  }, []);
+  
+  const handleImageSelect = useCallback((file: File) => { handleReset(); const src = URL.createObjectURL(file); setImage({ file, src, mimeType: file.type }); }, [handleReset]);
   
   const handleProcessResult = async (newEntry: HistoryEntry) => {
     triggerHapticFeedback([100, 30, 100]); // Success feedback
@@ -778,7 +1025,10 @@ function App() {
 };
 
   const handleTextSearch = async (query: string) => {
-    handleReset(); setIsLoading(true); setIsTextSearching(true);
+    handleReset(); 
+    setMainMode('identify');
+    setIsLoading(true); 
+    setIsTextSearching(true);
     if (!effectiveApiKey) { setError(t('apiKeyError')); setIsApiKeyModalOpen(true); setIsLoading(false); return; }
     try {
         const { plantInfo, sources, imageSrc, mapaDistribucionSrc, imageGenerationFailed } = await identifyPlantFromText(effectiveApiKey, query, language);
@@ -801,7 +1051,10 @@ function App() {
   };
   
   const handleRemedySearch = async (query: string, useGeo: boolean) => {
-    handleReset(); setIsLoading(true); setRemedyQuery(query);
+    handleReset(); 
+    setMainMode('remedy');
+    setIsLoading(true); 
+    setRemedyQuery(query);
     if (!effectiveApiKey) { setError(t('apiKeyError')); setIsApiKeyModalOpen(true); setIsLoading(false); return; }
     try {
         const location = useGeo ? await getLocation() : null;
@@ -834,7 +1087,6 @@ function App() {
     }
   };
 
-  const handleReset = () => { setImage(null); setCurrentResult(null); setError(null); setIsLoading(false); setIsTextSearching(false); setView('main'); setComparisonPlants({ plantA: null, plantB: null }); setComparisonResult(null); setSuggestedPlants(null); setRemedyQuery(''); };
   const handleViewHistoryItem = (item: HistoryEntry) => { setCurrentResult(item); setIsHistoryOpen(false); setIsHerbariumOpen(false); setView('main'); };
   
   const handleToggleHerbarium = async () => {
@@ -916,10 +1168,19 @@ function App() {
         </div>
         );
         if (suggestedPlants) return <SuggestedPlantsList suggestions={suggestedPlants} query={remedyQuery} onSelect={handleTextSearch} onReset={handleReset} />;
+        
+        const showDiscovery = mainMode === 'discover';
+
         return (
         <div className="flex flex-col items-center gap-4">
-            <MainInput onImageSelect={handleImageSelect} isLoading={isLoading} onTextSearch={handleTextSearch} onRemedySearch={handleRemedySearch} onError={setError} mode={mainMode} onModeChange={setMainMode} />
-            <div className="flex flex-wrap justify-center items-center gap-4">
+            {!showDiscovery && <MainInput onImageSelect={handleImageSelect} isLoading={isLoading} onTextSearch={handleTextSearch} onRemedySearch={handleRemedySearch} onError={setError} mode={mainMode} onModeChange={setMainMode} />}
+            {showDiscovery && <DiscoveryView onSelectPlant={handleTextSearch} onSelectCategory={(category) => handleRemedySearch(category, false)} />}
+            
+            <div className="flex flex-wrap justify-center items-center gap-4 mt-4">
+                <button onClick={() => { setMainMode(mainMode === 'discover' ? 'identify' : 'discover'); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
+                    <Icon name={mainMode === 'discover' ? 'search' : 'compass'} className="w-5 h-5" />
+                    {mainMode === 'discover' ? t('backToMainSearch') : t('discover')}
+                </button>
                 {history.length > 0 && <button onClick={() => { setIsHistoryOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="history" className="w-5 h-5" />{t('history')}</button>}
                 {herbarium.length > 0 && <button onClick={() => { setIsHerbariumOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="book" className="w-5 h-5" />{t('myHerbarium')}</button>}
                 <button onClick={() => { setIsManualOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
@@ -932,8 +1193,9 @@ function App() {
     };
 
     const renderComparatorView = () => {
-        const { plantA } = comparisonPlants;
+        const { plantA, plantB } = comparisonPlants;
         if (!plantA || !plantA.plantInfo) return (<div>Error: source plant not selected.<button onClick={handleReset}>Go Back</button></div>);
+
         const handleComparisonSearch = async (query: string) => {
             setIsLoading(true); setError(null); setComparisonResult(null);
             try {
@@ -942,6 +1204,7 @@ function App() {
                 setComparisonPlants(prev => ({ ...prev, plantB: { id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: finalImageSrc, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined } }));
             } catch (err: any) { setError(err.message || 'Could not find the plant to compare.'); } finally { setIsLoading(false); }
         };
+
         const handleGenerateComparison = async () => {
             if (!comparisonPlants.plantA?.plantInfo || !comparisonPlants.plantB?.plantInfo) return;
             setIsLoading(true); setError(null); setComparisonResult(null);
@@ -951,22 +1214,74 @@ function App() {
                 triggerHapticFeedback([100, 30, 100]);
             } catch (err: any) { setError(err.message || 'Could not generate the comparison.'); } finally { setIsLoading(false); }
         }
+
+        const getToxicityBadge = (level: string) => {
+            const config = {
+              None: { text: t('toxicityLevel_None'), color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
+              Low: { text: t('toxicityLevel_Low'), color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' },
+              Medium: { text: t('toxicityLevel_Medium'), color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300' },
+              High: { text: t('toxicityLevel_High'), color: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' },
+              Lethal: { text: t('toxicityLevel_Lethal'), color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
+              'N/A': { text: 'N/A', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+            };
+            const { text, color } = config[level as keyof typeof config] || config.Low;
+            return <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${color}`}>{text}</span>;
+        };
+
         return (
-            <div className="w-full max-w-5xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden my-8 border border-green-200 dark:border-emerald-800 p-8">
+            <div className="w-full max-w-5xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden my-8 border border-green-200 dark:border-emerald-800 p-6 sm:p-8">
                 <h2 className="text-3xl font-bold text-center text-green-900 dark:text-emerald-200 mb-6">{t('botanicalComparator')}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-8 items-start">
                     <div className="text-center p-4 border border-gray-200 dark:border-slate-700 rounded-lg"><img src={plantA.imageSrc} alt={plantA.plantInfo.nombreComun} className="w-32 h-32 object-cover rounded-full mx-auto mb-4 shadow-lg" /><h3 className="font-bold text-xl text-green-800 dark:text-emerald-300">{plantA.plantInfo.nombreComun}</h3><p className="text-sm italic text-gray-500 dark:text-slate-400">{plantA.plantInfo.nombreCientifico}</p></div>
                     <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg">{comparisonPlants.plantB ? (<div className="text-center"><img src={comparisonPlants.plantB.imageSrc} alt={comparisonPlants.plantB.plantInfo?.nombreComun} className="w-32 h-32 object-cover rounded-full mx-auto mb-4 shadow-lg" /><h3 className="font-bold text-xl text-green-800 dark:text-emerald-300">{comparisonPlants.plantB.plantInfo?.nombreComun}</h3><p className="text-sm italic text-gray-500 dark:text-slate-400">{comparisonPlants.plantB.plantInfo?.nombreCientifico}</p></div>) : (<div className="text-center"><h3 className="font-bold text-xl mb-4 text-gray-700 dark:text-slate-300">{t('selectPlantB')}</h3><SearchInput onSearch={handleComparisonSearch} isLoading={isLoading} /></div>)}</div>
                 </div>
-                <div className="text-center mb-8"><button onClick={() => { handleGenerateComparison(); triggerHapticFeedback(); }} disabled={!comparisonPlants.plantB || isLoading} className="px-8 py-4 bg-green-600 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-transform transform hover:scale-105"><div className="flex items-center gap-3"><Icon name="compare" className="w-6 h-6" /><span>{t('generateComparison')}</span></div></button></div>
+                <div className="text-center mb-8"><button onClick={() => { handleGenerateComparison(); triggerHapticFeedback(); }} disabled={!comparisonPlants.plantB || isLoading} className="px-8 py-4 bg-green-600 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-transform transform hover:scale-105"><div className="flex items-center gap-3"><Icon name="compare" className="w-6 h-6" /><span>{isLoading && !comparisonResult ? t('generating') : t('generateComparison')}</span></div></button></div>
                 {isLoading && !comparisonResult && <Loader message={t('generatingComparison')} subMessage="" />}
-                {error && <p className="text-red-500 text-center">{error}</p>}
+                {error && <p className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/50 rounded-lg">{error}</p>}
                 {comparisonResult && (
-                    <div className="mt-8 border-t border-gray-200 dark:border-slate-700 pt-8">
-                        <h3 className="text-2xl font-bold mb-4">{t('comparativeAnalysis')}</h3><p className="mb-6 bg-green-50 dark:bg-emerald-900/40 p-4 rounded-lg">{comparisonResult.resumenComparativo}</p>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div><h4 className="font-bold text-lg mb-2">{t('medicinalUses')}</h4><p className="font-semibold text-sm">{t('similarities')}:</p><ul className="list-disc pl-5 mb-3 text-sm">{comparisonResult.usosMedicinales.similitudes.map((s,i) => <li key={i}>{s}</li>)}</ul><p className="font-semibold text-sm">{t('differences')}:</p><ul className="list-disc pl-5 text-sm">{comparisonResult.usosMedicinales.diferencias.map((d,i) => <li key={i}>{d}</li>)}</ul></div>
-                            <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-800"><h4 className="font-bold text-lg mb-2 text-amber-900 dark:text-amber-200">{t('toxicity')}</h4><p className="mb-3 text-sm">{comparisonResult.toxicidad.comparacion}</p><div className="flex justify-around text-center text-sm"><div><strong>{plantA.plantInfo.nombreComun}:</strong><br/>{comparisonResult.toxicidad.nivelPlantaA}</div><div><strong>{comparisonPlants.plantB?.plantInfo?.nombreComun}:</strong><br/>{comparisonResult.toxicidad.nivelPlantaB}</div></div></div>
+                    <div className="space-y-6 mt-8 border-t border-gray-200 dark:border-slate-700 pt-8">
+                        <div>
+                            <h3 className="text-2xl font-bold mb-4 text-center">{t('comparativeAnalysis')}</h3>
+                            <p className="mb-6 bg-green-50 dark:bg-emerald-900/40 p-4 rounded-lg text-gray-700 dark:text-slate-300">{comparisonResult.resumenComparativo}</p>
+                        </div>
+                        
+                        <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                            <h4 className="font-bold text-lg mb-3 flex items-center gap-2"><Icon name="leaf" className="w-5 h-5 text-green-600 dark:text-emerald-500" />{t('medicinalUses')}</h4>
+                            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                                <div><h5 className="font-semibold mb-2">{t('similarities')}</h5><ul className="list-disc pl-5 space-y-1">{comparisonResult.usosMedicinales.similitudes.map((s,i) => <li key={i}>{s}</li>) || <li>-</li>}</ul></div>
+                                <div><h5 className="font-semibold mb-2">{t('differences')}</h5><ul className="list-disc pl-5 space-y-1">{comparisonResult.usosMedicinales.diferencias.map((d,i) => <li key={i}>{d}</li>) || <li>-</li>}</ul></div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                            <h4 className="font-bold text-lg mb-3 flex items-center gap-2"><Icon name="beaker" className="w-5 h-5 text-green-600 dark:text-emerald-500" />{t('principiosActivos')}</h4>
+                            <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                                <div><h5 className="font-semibold mb-2">{t('compartidos')}</h5><ul className="list-disc pl-5 space-y-1">{comparisonResult.principiosActivos.compartidos.map((s,i) => <li key={i}>{s}</li>) || <li>-</li>}</ul></div>
+                                <div>
+                                    <h5 className="font-semibold mb-2">{t('unicos')}</h5>
+                                    <p className="font-medium">{t('unicosPlantaA', { plantName: plantA.plantInfo.nombreComun })}</p>
+                                    <ul className="list-disc pl-5 space-y-1 mb-2">{comparisonResult.principiosActivos.unicos.plantaA.map((d,i) => <li key={i}>{d}</li>) || <li>-</li>}</ul>
+                                    <p className="font-medium">{t('unicosPlantaB', { plantName: plantB?.plantInfo?.nombreComun || 'B' })}</p>
+                                    <ul className="list-disc pl-5 space-y-1">{comparisonResult.principiosActivos.unicos.plantaB.map((d,i) => <li key={i}>{d}</li>) || <li>-</li>}</ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50 dark:bg-amber-900/40">
+                            <h4 className="font-bold text-lg mb-3 flex items-center gap-2 text-amber-900 dark:text-amber-200"><Icon name="cross" className="w-5 h-5" />{t('toxicity')}</h4>
+                            <p className="mb-4 text-sm">{comparisonResult.toxicidad.comparacion}</p>
+                            <div className="flex justify-around text-center text-sm font-semibold">
+                                <div className="flex flex-col items-center gap-1"><span>{plantA.plantInfo.nombreComun}</span>{getToxicityBadge(comparisonResult.toxicidad.nivelPlantaA)}</div>
+                                <div className="flex flex-col items-center gap-1"><span>{plantB?.plantInfo?.nombreComun}</span>{getToxicityBadge(comparisonResult.toxicidad.nivelPlantaB)}</div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                             <h4 className="font-bold text-lg mb-3 flex items-center gap-2"><Icon name="globe" className="w-5 h-5 text-green-600 dark:text-emerald-500" />{t('diferenciasBotanicas')}</h4>
+                             <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                                <div><h5 className="font-semibold mb-2">{t('habitat')}</h5><p>{comparisonResult.diferenciasBotanicas.habitat}</p></div>
+                                <div><h5 className="font-semibold mb-2">{t('apariencia')}</h5><p>{comparisonResult.diferenciasBotanicas.apariencia}</p></div>
+                             </div>
                         </div>
                     </div>
                 )}

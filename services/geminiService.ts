@@ -79,6 +79,13 @@ La respuesta DEBE ser un objeto JSON con las siguientes claves EXACTAS: "riego",
 La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.**
 `;
 
+const generateLocalPlantsPrompt_es = (location: { latitude: number; longitude: number }) => `
+Eres un etnobotánico experto. Basado en la ubicación geográfica (latitud ${location.latitude}, longitud ${location.longitude}), genera una lista de 3 a 4 plantas medicinales comunes y notables nativas o que crecen abundantemente en esa región.
+La respuesta DEBE ser un array JSON de objetos, cada uno con claves "nombreComun" y "relevancia", las cuales son obligatorias. No incluyas markdown.
+Ejemplo: [{"nombreComun": "Diente de León", "relevancia": "Crece comúnmente en praderas y céspedes de la zona, conocido por sus propiedades diuréticas."}]
+`;
+
+
 // --- ENGLISH PROMPTS ---
 
 const generateJsonPrompt_en = (context: string) => `
@@ -142,6 +149,12 @@ The response MUST be a JSON object with the following EXACT keys: "riego", "luz"
 - For "consejosAdicionales" (additional tips), include "purificacionAire" (if the plant purifies air), "seguridadMascotas" (if it's safe for pets and children), and "datoCurioso" (fun fact).
 - Be specific and provide practical tips for an amateur gardener.
 The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.**
+`;
+
+const generateLocalPlantsPrompt_en = (location: { latitude: number; longitude: number }) => `
+You are an expert ethnobotanist. Based on the geographic location (latitude ${location.latitude}, longitude ${location.longitude}), generate a list of 3 to 4 common and notable medicinal plants native to or growing abundantly in that region.
+The response MUST be a JSON array of objects, each with "nombreComun" and "relevancia" keys, which are mandatory. Do not include markdown.
+Example: [{"nombreComun": "Dandelion", "relevancia": "Grows commonly in meadows and lawns in the area, known for its diuretic properties."}]
 `;
 
 
@@ -557,6 +570,37 @@ export const findPlantsByUsage = async (
     } catch (error) {
         handleApiError(error);
         throw new Error("Unhandled error in remedy search.");
+    }
+};
+
+export const findLocalPlants = async (
+    apiKey: string,
+    location: { latitude: number; longitude: number },
+    language: 'es' | 'en'
+): Promise<SuggestedPlant[]> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const promptGenerator = language === 'es' ? generateLocalPlantsPrompt_es : generateLocalPlantsPrompt_en;
+        const textPart = { text: promptGenerator(location) };
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("The model's response for local plants search is empty.");
+        if (data.error) throw new Error(data.error);
+
+        const sanitizedData = sanitizeSuggestedPlants(data);
+        if (!sanitizedData) {
+            throw new Error("Could not find valid local plant suggestions from the model.");
+        }
+        return sanitizedData;
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled error in local plants search.");
     }
 };
 
