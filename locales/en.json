@@ -121,6 +121,5 @@
   "airPurification": "Air Purification",
   "petSafety": "Pet Safety",
   "funFact": "Fun Fact",
-  "appManual": "App Manual",
-  "imageGenerationError": "Plant information was found, but an image could not be generated. This often happens if the Imagen model is not enabled for your API key's project. Please check your Google AI Studio project settings."
+  "appManual": "App Manual"
 }

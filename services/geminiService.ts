@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI, GroundingChunk, Type, Modality } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from '../types';
 
@@ -320,10 +322,14 @@ async function generateDistributionMap(apiKey: string, plantInfo: PlantInfo, lan
             },
         });
 
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                return `data:image/jpeg;base64,${base64ImageBytes}`;
+        const firstCandidate = response?.candidates?.[0];
+        if (firstCandidate?.content?.parts) {
+            for (const part of firstCandidate.content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    const mimeType: string = part.inlineData.mimeType;
+                    return `data:${mimeType};base64,${base64ImageBytes}`;
+                }
             }
         }
         return null;
@@ -332,6 +338,39 @@ async function generateDistributionMap(apiKey: string, plantInfo: PlantInfo, lan
         return null;
     }
 }
+
+async function generatePlantImage(apiKey: string, plantInfo: PlantInfo, language: 'es' | 'en'): Promise<string | null> {
+    try {
+        const ai = getAiClient(apiKey);
+        const prompt_text = language === 'es'
+            ? `Fotografía realista y detallada de la planta ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) en su hábitat natural. Descripción: "${plantInfo.descripcionGeneral}".`
+            : `Realistic and detailed photograph of the plant ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) in its natural habitat. Description: "${plantInfo.descripcionGeneral}".`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt_text }] },
+            config: {
+                responseModalities: [Modality.IMAGE],
+            },
+        });
+
+        const firstCandidate = response?.candidates?.[0];
+        if (firstCandidate?.content?.parts) {
+            for (const part of firstCandidate.content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    const mimeType: string = part.inlineData.mimeType;
+                    return `data:${mimeType};base64,${base64ImageBytes}`;
+                }
+            }
+        }
+        return null; // Return null if no image data is found in a successful response.
+    } catch (error) {
+        console.error("Graceful Error: Could not generate plant image. This is expected if the image model is not enabled for the API key. Falling back to placeholder.", error);
+        return null; // Return null on any error to allow fallback.
+    }
+}
+
 
 export const identifyPlantFromImage = async (
   apiKey: string,
@@ -360,40 +399,16 @@ export const identifyPlantFromText = async (
   apiKey: string,
   plantName: string,
   language: 'es' | 'en'
-): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null, imageError?: boolean }> => {
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null }> => {
     const context = language === 'es' ? `Busca información sobre la planta llamada "${plantName}"` : `Find information about the plant named "${plantName}"`;
     const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
     const textPart = { text: promptGenerator(context) };
     const { plantInfo, sources } = await getPlantInfo(apiKey, [textPart], false);
+
+    const imageSrc = await generatePlantImage(apiKey, plantInfo, language);
     const mapaDistribucionSrc = await generateDistributionMap(apiKey, plantInfo, language);
 
-    try {
-        const ai = getAiClient(apiKey);
-        const imagePrompt = language === 'es' 
-            ? `Una fotografía realista y botánicamente precisa de ${plantInfo.nombreCientifico} (${plantInfo.nombreComun}), mostrando claramente sus flores y hojas en su hábitat natural.`
-            : `A realistic and botanically accurate photograph of ${plantInfo.nombreCientifico} (${plantInfo.nombreComun}), clearly showing its flowers and leaves in its natural habitat.`;
-        
-        const imageResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: imagePrompt }] },
-            config: {
-                responseModalities: [Modality.IMAGE],
-            },
-        });
-
-        for (const part of imageResponse.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
-                return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
-            }
-        }
-        // If loop completes without returning, no image was found
-        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc, imageError: true };
-    } catch (error) {
-        console.error("Error generating image:", error);
-        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc, imageError: true };
-    }
+    return { plantInfo, sources, imageSrc, mapaDistribucionSrc };
 };
 
 export const diagnosePlantDiseaseFromImage = async (

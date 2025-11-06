@@ -46,6 +46,52 @@ const createPlaceholderImage = (text: string): string => {
   return `data:image/svg+xml;base64,${base64Svg}`;
 };
 
+// Creates a compressed thumbnail from a data URL to save storage space.
+const createThumbnail = (dataUrl: string, maxSize = 400): Promise<string> => {
+    return new Promise((resolve) => {
+        if (!dataUrl || !dataUrl.startsWith('data:image')) {
+            resolve(dataUrl); // Not an image data URL, return as is.
+            return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Failed to get canvas context');
+                resolve(dataUrl); // Fallback to original
+                return;
+            }
+
+            let { width, height } = img;
+            if (width > height) {
+                if (width > maxSize) {
+                    height *= maxSize / width;
+                    width = maxSize;
+                }
+            } else {
+                if (height > maxSize) {
+                    width *= maxSize / height;
+                    height = maxSize;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Use JPEG for better compression of photographic images.
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => {
+            console.error("Failed to load image for thumbnail creation.");
+            resolve(dataUrl); // Fallback to original URL on error.
+        };
+        img.src = dataUrl;
+    });
+};
+
 
 // --- SUB-COMPONENTS ---
 
@@ -162,7 +208,7 @@ interface ResultCardProps {
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium, onToggleHerbarium, onStartCompare, onGenerateCareGuide, isGeneratingCareGuide }) => {
-    const { plantInfo, sources, imageSrc, mapaDistribucionSrc, careGuide, imageError } = result;
+    const { plantInfo, sources, imageSrc, mapaDistribucionSrc, careGuide } = result;
     const { t } = useLanguage();
     if (!plantInfo) return null;
 
@@ -202,11 +248,6 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
             <div className="md:flex md:gap-8">
                 <div className="md:w-1/3 mb-6 md:mb-0">
                     <img src={imageSrc} alt={plantInfo.nombreComun} className="rounded-xl shadow-lg w-full object-cover aspect-square"/>
-                    {imageError && (
-                        <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 rounded-lg text-center">
-                            <p className="text-xs text-amber-900 dark:text-amber-200">{t('imageGenerationError')}</p>
-                        </div>
-                    )}
                 </div>
                 <div className="md:w-2/3">
                      <div className="flex justify-between items-start">
@@ -506,7 +547,28 @@ function App() {
   const saveHistory = (newHistory: HistoryEntry[]) => { const sorted = newHistory.sort((a, b) => b.timestamp - a.timestamp); setHistory(sorted); localStorage.setItem('plantHistory', JSON.stringify(sorted)); };
   const saveHerbarium = (newHerbarium: HistoryEntry[]) => { setHerbarium(newHerbarium); localStorage.setItem('plantHerbarium', JSON.stringify(newHerbarium)); };
   const handleImageSelect = useCallback((file: File) => { handleReset(); const src = URL.createObjectURL(file); setImage({ file, src, mimeType: file.type }); }, []);
-  const handleProcessResult = (newEntry: HistoryEntry) => { setCurrentResult(newEntry); saveHistory([newEntry, ...history].slice(0, 50)); };
+  
+  const handleProcessResult = async (newEntry: HistoryEntry) => {
+    try {
+        const thumbImageSrc = await createThumbnail(newEntry.imageSrc);
+        const thumbMapSrc = newEntry.mapaDistribucionSrc ? await createThumbnail(newEntry.mapaDistribucionSrc) : undefined;
+        
+        const finalEntry = {
+            ...newEntry,
+            imageSrc: thumbImageSrc,
+            mapaDistribucionSrc: thumbMapSrc,
+        };
+
+        setCurrentResult(finalEntry);
+        saveHistory([finalEntry, ...history].slice(0, 30));
+    } catch (error) {
+        console.error("Error creating thumbnails for history:", error);
+        // Fallback to saving the original entry
+        setCurrentResult(newEntry);
+        saveHistory([newEntry, ...history].slice(0, 30));
+    }
+  };
+
   const getLocation = (): Promise<{ latitude: number; longitude: number } | null> => new Promise((resolve) => { if (!navigator.geolocation) { resolve(null); } navigator.geolocation.getCurrentPosition( (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }), () => resolve(null), { timeout: 10000 } ); });
   
   const processImage = async () => {
@@ -519,10 +581,10 @@ function App() {
         if (mainMode === 'identify') {
             const location = await getLocation();
             const { plantInfo, sources, mapaDistribucionSrc } = await identifyPlantFromImage(effectiveApiKey, base64Image, image.mimeType, location, language);
-            handleProcessResult({ id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: imageSrcDataUrl, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined });
+            await handleProcessResult({ id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: imageSrcDataUrl, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined });
         } else {
             const { diseaseInfo, sources } = await diagnosePlantDiseaseFromImage(effectiveApiKey, base64Image, image.mimeType, language);
-            handleProcessResult({ id: `${Date.now()}-${diseaseInfo.nombreEnfermedad}`, timestamp: Date.now(), imageSrc: imageSrcDataUrl, type: 'disease', diseaseInfo, sources });
+            await handleProcessResult({ id: `${Date.now()}-${diseaseInfo.nombreEnfermedad}`, timestamp: Date.now(), imageSrc: imageSrcDataUrl, type: 'disease', diseaseInfo, sources });
         }
     } catch (err: any) {
         const errorMessage = err.message || t('unexpectedError'); setError(errorMessage);
@@ -534,20 +596,16 @@ function App() {
     handleReset(); setIsLoading(true); setIsTextSearching(true);
     if (!effectiveApiKey) { setError(t('apiKeyError')); setIsApiKeyModalOpen(true); setIsLoading(false); return; }
     try {
-        const { plantInfo, sources, imageSrc, mapaDistribucionSrc, imageError } = await identifyPlantFromText(effectiveApiKey, query, language);
-        let finalImageSrc = imageSrc;
-        if (imageSrc === null) {
-          finalImageSrc = createPlaceholderImage(t('imagePlaceholderText'));
-        }
-        handleProcessResult({ 
+        const { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
+        const finalImageSrc = imageSrc || createPlaceholderImage(plantInfo.nombreComun);
+        await handleProcessResult({ 
             id: `${Date.now()}-${plantInfo.nombreCientifico}`, 
             timestamp: Date.now(), 
             imageSrc: finalImageSrc, 
             type: 'plant', 
             plantInfo, 
             sources, 
-            mapaDistribucionSrc: mapaDistribucionSrc ?? undefined,
-            imageError: imageError 
+            mapaDistribucionSrc: mapaDistribucionSrc ?? undefined
         });
     } catch (err: any) {
         const errorMessage = err.message || t('unexpectedError');
@@ -591,7 +649,33 @@ function App() {
 
   const handleReset = () => { setImage(null); setCurrentResult(null); setError(null); setIsLoading(false); setIsTextSearching(false); setView('main'); setComparisonPlants({ plantA: null, plantB: null }); setComparisonResult(null); setSuggestedPlants(null); setRemedyQuery(''); };
   const handleViewHistoryItem = (item: HistoryEntry) => { setCurrentResult(item); setIsHistoryOpen(false); setIsHerbariumOpen(false); setView('main'); };
-  const handleToggleHerbarium = () => { if (!currentResult) return; const exists = herbarium.some(entry => entry.id === currentResult.id); if (exists) saveHerbarium(herbarium.filter(entry => entry.id !== currentResult.id)); else saveHerbarium([currentResult, ...herbarium]); };
+  
+  const handleToggleHerbarium = async () => {
+      if (!currentResult) return;
+      const exists = herbarium.some(entry => entry.id === currentResult.id);
+      if (exists) {
+          saveHerbarium(herbarium.filter(entry => entry.id !== currentResult.id));
+      } else {
+           try {
+              const [thumbImageSrc, thumbMapSrc] = await Promise.all([
+                  createThumbnail(currentResult.imageSrc),
+                  currentResult.mapaDistribucionSrc ? createThumbnail(currentResult.mapaDistribucionSrc) : Promise.resolve(undefined)
+              ]);
+              const finalEntry = {
+                  ...currentResult,
+                  imageSrc: thumbImageSrc,
+                  mapaDistribucionSrc: thumbMapSrc,
+              };
+              saveHerbarium([finalEntry, ...herbarium]);
+          } catch (err: any) {
+              console.error("Could not create thumbnail for herbarium:", err);
+              // Since createThumbnail now handles errors by returning original, this path is less likely.
+              // Still, we can save the original as a last resort.
+              saveHerbarium([currentResult, ...herbarium]);
+          }
+      }
+  };
+
   const handleRemoveFromHerbarium = (id: string) => saveHerbarium(herbarium.filter(entry => entry.id !== id));
   const handleCloseHerbarium = () => { setIsHerbariumOpen(false); setHerbariumNameFilter(''); setHerbariumUseFilter(''); setHerbariumSortOrder('date-desc'); };
   const handleStartCompare = (plantEntry: HistoryEntry) => { setComparisonPlants({ plantA: plantEntry, plantB: null }); setComparisonResult(null); setCurrentResult(null); setError(null); setView('comparator'); setIsHerbariumOpen(false); };
@@ -651,8 +735,9 @@ function App() {
         const handleComparisonSearch = async (query: string) => {
             setIsLoading(true); setError(null); setComparisonResult(null);
             try {
-                const { plantInfo, sources, imageSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
-                setComparisonPlants(prev => ({ ...prev, plantB: { id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: imageSrc ?? undefined, type: 'plant', plantInfo, sources } }));
+                const { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
+                const finalImageSrc = imageSrc || createPlaceholderImage(plantInfo.nombreComun);
+                setComparisonPlants(prev => ({ ...prev, plantB: { id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: finalImageSrc, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined } }));
             } catch (err: any) { setError(err.message || 'Could not find the plant to compare.'); } finally { setIsLoading(false); }
         };
         const handleGenerateComparison = async () => {
