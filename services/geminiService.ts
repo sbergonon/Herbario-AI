@@ -1,7 +1,7 @@
 import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from '../types';
 
-if (!process.env.API_KEY) {
+if (!import.meta.env.VITE_GEMINI_API_KEY) {
   // This check is now less critical as the key is passed in, but good for fallback awareness.
 }
 
