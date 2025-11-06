@@ -356,7 +356,7 @@ export const identifyPlantFromText = async (
   apiKey: string,
   plantName: string,
   language: 'es' | 'en'
-): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null }> => {
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null, imageError?: boolean }> => {
     const context = language === 'es' ? `Busca información sobre la planta llamada "${plantName}"` : `Find information about the plant named "${plantName}"`;
     const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
     const textPart = { text: promptGenerator(context) };
@@ -378,7 +378,7 @@ export const identifyPlantFromText = async (
         return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
     } catch (error) {
         console.error("Error generating image:", error);
-        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc };
+        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc, imageError: true };
     }
 };
 

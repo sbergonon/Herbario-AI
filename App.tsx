@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PlantInfo, GroundingSource, HistoryEntry, Preparation, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from './types';
 import { identifyPlantFromImage, identifyPlantFromText, diagnosePlantDiseaseFromImage, comparePlants, findPlantsByUsage, generateCareGuide } from './services/geminiService';
@@ -161,7 +162,7 @@ interface ResultCardProps {
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium, onToggleHerbarium, onStartCompare, onGenerateCareGuide, isGeneratingCareGuide }) => {
-    const { plantInfo, sources, imageSrc, mapaDistribucionSrc, careGuide } = result;
+    const { plantInfo, sources, imageSrc, mapaDistribucionSrc, careGuide, imageError } = result;
     const { t } = useLanguage();
     if (!plantInfo) return null;
 
@@ -199,7 +200,14 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
     <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden my-8 border border-green-200 dark:border-emerald-800">
         <div className="p-6 md:p-8">
             <div className="md:flex md:gap-8">
-                <div className="md:w-1/3 mb-6 md:mb-0"><img src={imageSrc} alt={plantInfo.nombreComun} className="rounded-xl shadow-lg w-full object-cover aspect-square"/></div>
+                <div className="md:w-1/3 mb-6 md:mb-0">
+                    <img src={imageSrc} alt={plantInfo.nombreComun} className="rounded-xl shadow-lg w-full object-cover aspect-square"/>
+                    {imageError && (
+                        <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 rounded-lg text-center">
+                            <p className="text-xs text-amber-900 dark:text-amber-200">{t('imageGenerationError')}</p>
+                        </div>
+                    )}
+                </div>
                 <div className="md:w-2/3">
                      <div className="flex justify-between items-start">
                         <div>
@@ -526,11 +534,21 @@ function App() {
     handleReset(); setIsLoading(true); setIsTextSearching(true);
     if (!effectiveApiKey) { setError(t('apiKeyError')); setIsApiKeyModalOpen(true); setIsLoading(false); return; }
     try {
-        let { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
+        const { plantInfo, sources, imageSrc, mapaDistribucionSrc, imageError } = await identifyPlantFromText(effectiveApiKey, query, language);
+        let finalImageSrc = imageSrc;
         if (imageSrc === null) {
-          imageSrc = createPlaceholderImage(t('imagePlaceholderText'));
+          finalImageSrc = createPlaceholderImage(t('imagePlaceholderText'));
         }
-        handleProcessResult({ id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined });
+        handleProcessResult({ 
+            id: `${Date.now()}-${plantInfo.nombreCientifico}`, 
+            timestamp: Date.now(), 
+            imageSrc: finalImageSrc, 
+            type: 'plant', 
+            plantInfo, 
+            sources, 
+            mapaDistribucionSrc: mapaDistribucionSrc ?? undefined,
+            imageError: imageError 
+        });
     } catch (err: any) {
         const errorMessage = err.message || t('unexpectedError');
         setError(errorMessage);

@@ -76,6 +76,7 @@ export interface HistoryEntry {
   sources: GroundingSource[];
   mapaDistribucionSrc?: string; // Optional data URL for the map
   careGuide?: CareGuideInfo; // Optional care guide
+  imageError?: boolean;
 }
 
 export interface ComparisonInfo {
