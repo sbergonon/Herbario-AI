@@ -1,7 +1,7 @@
 import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from '../types';
 
-if (!import.meta.env.VITE_GEMINI_API_KEY) {
+if (!process.env.API_KEY) {
   // This check is now less critical as the key is passed in, but good for fallback awareness.
 }
 
@@ -378,7 +378,7 @@ export const identifyPlantFromText = async (
         return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
     } catch (error) {
         console.error("Error generating image:", error);
-        throw new Error("Plant information was found, but an image could not be generated.");
+        throw new Error("IMAGE_GENERATION_FAILED");
     }
 };
 

@@ -121,5 +121,6 @@
   "airPurification": "Purificación del Aire",
   "petSafety": "Seguridad para Mascotas",
   "funFact": "Dato Curioso",
-  "appManual": "Manual de la App"
+  "appManual": "Manual de la App",
+  "imageGenerationError": "Se encontró la información de la planta, pero no se pudo generar una imagen. Esto suele ocurrir si el modelo Imagen no está habilitado en el proyecto de tu clave de API. Por favor, comprueba la configuración de tu proyecto en Google AI Studio."
 }

@@ -37,7 +37,7 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUserApiKey(null);
   };
   
-  const effectiveApiKey = userApiKey || import.meta.env.VITE_GEMINI_API_KEY || null;
+  const effectiveApiKey = userApiKey;
 
   const value: ApiKeyContextState = {
     userApiKey,

@@ -1,7 +1,258 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 
+const esTranslations = {
+  "appName": "Herbario IA",
+  "identifyPlant": "Identificar",
+  "diagnosePlant": "Diagnosticar",
+  "findRemedy": "Remedio",
+  "searchByNamePlaceholder": "Buscar planta por nombre...",
+  "takePhoto": "Tomar Foto",
+  "uploadFile": "Subir Archivo",
+  "warningDisclaimer": "Advertencia: Esta aplicación es una herramienta con fines educativos e informativos. No constituye consejo médico. Consulta siempre a un profesional cualificado.",
+  "analyzing": "Analizando...",
+  "loadingMessage": "Esto puede tardar un momento.",
+  "errorTitle": "Error",
+  "tryAgain": "Intentar de Nuevo",
+  "history": "Historial",
+  "myHerbarium": "Mi Herbario",
+  "medicinalUses": "Usos Medicinales",
+  "toxicity": "Toxicidad",
+  "sources": "Fuentes",
+  "save": "Guardar",
+  "saved": "Guardado",
+  "compare": "Comparar",
+  "anotherQuery": "Realizar otra consulta",
+  "manageApiKey": "Gestionar Clave de API",
+  "apiKeyModalTitle": "Parece que has alcanzado el límite de consultas o la clave de API no es válida. Puedes introducir tu propia clave de API de Gemini para continuar.",
+  "yourApiKeyLabel": "Tu Clave de API de Gemini",
+  "apiKeyPlaceholder": "Introduce tu clave aquí",
+  "saveAndRetry": "Guardar y Reintentar",
+  "clearKey": "Borrar Clave",
+  "getYourApiKey": "Puedes obtener tu clave de API en {link}. Tu clave se guarda de forma segura solo en tu navegador.",
+  "apiKeyError": "Por favor, configura tu clave de API para continuar.",
+  "unexpectedError": "Ocurrió un error inesperado.",
+  "alsoKnownAs": "También conocida como",
+  "habitat": "Hábitat",
+  "flowering": "Floración",
+  "conservation": "Conservación",
+  "distributionMap": "Mapa de Distribución Geográfica",
+  "culinaryUses": "Usos Culinarios",
+  "activeCompounds": "Principios Activos",
+  "similarPlants": "Plantas Similares y Advertencias",
+  "preparationsAndRecipes": "Preparaciones y Recetas",
+  "share": "Compartir",
+  "copied": "Copiado",
+  "similarActivePlants": "Otras Plantas con Principios Activos Similares",
+  "sharedActiveCompound": "Principio Activo Compartido",
+  "keyDifference": "Diferencia Clave",
+  "importantDisclaimerSimilar": "Importante: Siempre ten extrema precaución al identificar plantas para consumo. En caso de duda, consulta a un experto. La identificación por IA puede no ser 100% precisa.",
+  "ingredients": "Ingredientes",
+  "instructions": "Instrucciones",
+  "recommendedDose": "Dosis Recomendada",
+  "possibleSideEffects": "Posibles Efectos Secundarios",
+  "historicalContext": "Contexto Histórico",
+  "identifyPlantTitle": "Identifica una planta por nombre o fotografía.",
+  "diagnosePlantTitle": "Sube una foto para diagnosticar un problema.",
+  "remedySearchTitle": "Busca plantas para tratar un síntoma o dolencia.",
+  "orSeparator": "O",
+  "remedySearchPlaceholder": "Escribe un síntoma, dolencia o uso...",
+  "prioritizeLocal": "Priorizar plantas locales",
+  "readyToAnalyze": "¿Lista para ser analizada?",
+  "changePhoto": "Cambiar Foto",
+  "analyze": "Analizar",
+  "textSearchLoading": "Buscando información...",
+  "textSearchLoadingSub": "La generación de imágenes puede tardar un poco más.",
+  "close": "Cerrar",
+  "historyModalTitle": "Historial",
+  "noHistory": "No hay búsquedas en tu historial.",
+  "clearHistory": "Borrar Historial",
+  "clearHistoryConfirm": "¿Estás seguro? Esta acción borrará todo tu historial.",
+  "herbariumModalTitle": "Mi Herbario",
+  "filterByName": "Filtrar por nombre...",
+  "filterByUse": "Filtrar por uso (plantas)...",
+  "sortBy": "Ordenar por",
+  "sortDateDesc": "Más recientes",
+  "sortDateAsc": "Más antiguos",
+  "sortNameAsc": "Nombre (A-Z)",
+  "sortNameDesc": "Nombre (Z-A)",
+  "noHerbarium": "Tu herbario está vacío. ¡Guarda plantas para empezar tu colección!",
+  "exportToJson": "Exportar a JSON",
+  "removeFromHerbarium": "Eliminar del herbario",
+  "remedySuggestionsTitle": "Sugerencias para \"{query}\"",
+  "remedySuggestionsSubtitle": "Hemos encontrado estas plantas que podrían ayudarte. Haz clic en una para ver su ficha completa.",
+  "anotherSearch": "Realizar otra búsqueda",
+  "botanicalComparator": "Comparador Botánico",
+  "selectPlantB": "Seleccionar Planta B",
+  "generateComparison": "Generar Comparación",
+  "backToMainSearch": "Volver a la Búsqueda Principal",
+  "generatingComparison": "Generando comparación...",
+  "comparativeAnalysis": "Análisis Comparativo",
+  "similarities": "Similitudes",
+  "differences": "Diferencias",
+  "symptoms": "Síntomas",
+  "causes": "Causas",
+  "organicTreatment": "Tratamiento Orgánico",
+  "chemicalTreatment": "Tratamiento Químico",
+  "prevention": "Prevención",
+  "diseaseDiagnostic": "Diagnóstico Fitosanitario",
+  "commonlyAffects": "Afecta comúnmente a",
+  "generateCareGuide": "Generar Guía de Cuidado",
+  "careGuide": "Guía de Cuidado",
+  "generating": "Generando...",
+  "watering": "Riego",
+  "light": "Luz",
+  "soil": "Suelo",
+  "temperatureAndHumidity": "Temperatura y Humedad",
+  "fertilization": "Fertilización",
+  "pruningAndPests": "Poda y Plagas",
+  "frequency": "Frecuencia",
+  "method": "Método",
+  "methods": "Métodos",
+  "level": "Nivel",
+  "location": "Ubicación",
+  "type": "Tipo",
+  "drainage": "Drenaje",
+  "temperature": "Temperatura",
+  "humidity": "Humedad",
+  "pruning": "Poda",
+  "commonPests": "Plagas Comunes",
+  "repotting": "Trasplante",
+  "propagation": "Propagación",
+  "additionalTips": "Consejos Adicionales",
+  "airPurification": "Purificación del Aire",
+  "petSafety": "Seguridad para Mascotas",
+  "funFact": "Dato Curioso",
+  "appManual": "Manual de la App",
+  "imageGenerationError": "Se encontró la información de la planta, pero no se pudo generar una imagen. Esto suele ocurrir si el modelo Imagen no está habilitado en el proyecto de tu clave de API. Por favor, comprueba la configuración de tu proyecto en Google AI Studio."
+};
+
+const enTranslations = {
+  "appName": "AI Herbarium",
+  "identifyPlant": "Identify",
+  "diagnosePlant": "Diagnose",
+  "findRemedy": "Remedy",
+  "searchByNamePlaceholder": "Search plant by name...",
+  "takePhoto": "Take Photo",
+  "uploadFile": "Upload File",
+  "warningDisclaimer": "Warning: This application is an educational and informational tool. It does not constitute medical advice. Always consult a qualified professional.",
+  "analyzing": "Analyzing...",
+  "loadingMessage": "This may take a moment.",
+  "errorTitle": "Error",
+  "tryAgain": "Try Again",
+  "history": "History",
+  "myHerbarium": "My Herbarium",
+  "medicinalUses": "Medicinal Uses",
+  "toxicity": "Toxicity",
+  "sources": "Sources",
+  "save": "Save",
+  "saved": "Saved",
+  "compare": "Compare",
+  "anotherQuery": "Make another query",
+  "manageApiKey": "Manage API Key",
+  "apiKeyModalTitle": "It seems you've reached the query limit or the API key is invalid. You can enter your own Gemini API key to continue.",
+  "yourApiKeyLabel": "Your Gemini API Key",
+  "apiKeyPlaceholder": "Enter your key here",
+  "saveAndRetry": "Save and Retry",
+  "clearKey": "Clear Key",
+  "getYourApiKey": "You can get your API key from {link}. Your key is stored securely in your browser only.",
+  "apiKeyError": "Please set up your API key to continue.",
+  "unexpectedError": "An unexpected error occurred.",
+  "alsoKnownAs": "Also known as",
+  "habitat": "Habitat",
+  "flowering": "Flowering",
+  "conservation": "Conservation",
+  "distributionMap": "Geographic Distribution Map",
+  "culinaryUses": "Culinary Uses",
+  "activeCompounds": "Active Compounds",
+  "similarPlants": "Similar Plants and Warnings",
+  "preparationsAndRecipes": "Preparations and Recipes",
+  "share": "Share",
+  "copied": "Copied",
+  "similarActivePlants": "Other Plants with Similar Active Compounds",
+  "sharedActiveCompound": "Shared Active Compound",
+  "keyDifference": "Key Difference",
+  "importantDisclaimerSimilar": "Important: Always exercise extreme caution when identifying plants for consumption. When in doubt, consult an expert. AI identification may not be 100% accurate.",
+  "ingredients": "Ingredients",
+  "instructions": "Instructions",
+  "recommendedDose": "Recommended Dose",
+  "possibleSideEffects": "Possible Side Effects",
+  "historicalContext": "Historical Context",
+  "identifyPlantTitle": "Identify a plant by name or photograph.",
+  "diagnosePlantTitle": "Upload a photo to diagnose a problem.",
+  "remedySearchTitle": "Search for plants to treat a symptom or ailment.",
+  "orSeparator": "OR",
+  "remedySearchPlaceholder": "Enter a symptom, ailment, or use...",
+  "prioritizeLocal": "Prioritize local plants",
+  "readyToAnalyze": "Ready to be analyzed?",
+  "changePhoto": "Change Photo",
+  "analyze": "Analyze",
+  "textSearchLoading": "Searching for information...",
+  "textSearchLoadingSub": "Image generation may take a little longer.",
+  "close": "Close",
+  "historyModalTitle": "History",
+  "noHistory": "There are no searches in your history.",
+  "clearHistory": "Clear History",
+  "clearHistoryConfirm": "Are you sure? This action will delete your entire history.",
+  "herbariumModalTitle": "My Herbarium",
+  "filterByName": "Filter by name...",
+  "filterByUse": "Filter by use (plants)...",
+  "sortBy": "Sort by",
+  "sortDateDesc": "Most recent",
+  "sortDateAsc": "Oldest",
+  "sortNameAsc": "Name (A-Z)",
+  "sortNameDesc": "Name (Z-A)",
+  "noHerbarium": "Your herbarium is empty. Save plants to start your collection!",
+  "exportToJson": "Export to JSON",
+  "removeFromHerbarium": "Remove from herbarium",
+  "remedySuggestionsTitle": "Suggestions for \"{query}\"",
+  "remedySuggestionsSubtitle": "We found these plants that might help you. Click on one to see its full details.",
+  "anotherSearch": "Perform another search",
+  "botanicalComparator": "Botanical Comparator",
+  "selectPlantB": "Select Plant B",
+  "generateComparison": "Generate Comparison",
+  "backToMainSearch": "Back to Main Search",
+  "generatingComparison": "Generating comparison...",
+  "comparativeAnalysis": "Comparative Analysis",
+  "similarities": "Similarities",
+  "differences": "Differences",
+  "symptoms": "Symptoms",
+  "causes": "Causes",
+  "organicTreatment": "Organic Treatment",
+  "chemicalTreatment": "Chemical Treatment",
+  "prevention": "Prevention",
+  "diseaseDiagnostic": "Plant Disease Diagnosis",
+  "commonlyAffects": "Commonly affects",
+  "generateCareGuide": "Generate Care Guide",
+  "careGuide": "Care Guide",
+  "generating": "Generating...",
+  "watering": "Watering",
+  "light": "Light",
+  "soil": "Soil",
+  "temperatureAndHumidity": "Temperature & Humidity",
+  "fertilization": "Fertilization",
+  "pruningAndPests": "Pruning & Pests",
+  "frequency": "Frequency",
+  "method": "Method",
+  "methods": "Methods",
+  "level": "Level",
+  "location": "Location",
+  "type": "Type",
+  "drainage": "Drainage",
+  "temperature": "Temperature",
+  "humidity": "Humidity",
+  "pruning": "Pruning",
+  "commonPests": "Common Pests",
+  "repotting": "Repotting",
+  "propagation": "Propagation",
+  "additionalTips": "Additional Tips",
+  "airPurification": "Air Purification",
+  "petSafety": "Pet Safety",
+  "funFact": "Fun Fact",
+  "appManual": "App Manual",
+  "imageGenerationError": "Plant information was found, but an image could not be generated. This often happens if the Imagen model is not enabled for your API key's project. Please check your Google AI Studio project settings."
+};
+
 type Language = 'es' | 'en';
-type Translations = { [key: string]: string };
 
 interface LanguageContextType {
   language: Language;
@@ -11,32 +262,10 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+const translations = { es: esTranslations, en: enTranslations };
+
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('es');
-  const [translations, setTranslations] = useState<{ [key in Language]?: Translations }>({});
-
-  useEffect(() => {
-    const fetchTranslations = async () => {
-      try {
-        const [esResponse, enResponse] = await Promise.all([
-          fetch('/locales/es.json'),
-          fetch('/locales/en.json')
-        ]);
-        if (!esResponse.ok || !enResponse.ok) {
-          throw new Error('Failed to fetch translation files');
-        }
-        const esData = await esResponse.json();
-        const enData = await enResponse.json();
-        setTranslations({ es: esData, en: enData });
-      } catch (error) {
-        console.error("Failed to load translation files:", error);
-        // Set empty translations to prevent crash, keys will be shown as fallback
-        setTranslations({ es: {}, en: {} });
-      }
-    };
-
-    fetchTranslations();
-  }, []);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -44,17 +273,17 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const t = useCallback((key: string, replacements?: { [key: string]: string | number }): string => {
     const translationSet = translations[language];
-    if (!translationSet || Object.keys(translationSet).length === 0) {
-      return key; // Return key if translations are not loaded yet or are empty
+    if (!translationSet) {
+      return key; // Fallback to key if translations are somehow missing
     }
-    let translation = translationSet[key] || key;
+    let translation = (translationSet as any)[key] || key;
     if (replacements) {
       Object.entries(replacements).forEach(([rKey, value]) => {
         translation = translation.replace(`{${rKey}}`, String(value));
       });
     }
     return translation;
-  }, [language, translations]);
+  }, [language]);
 
   const value = { language, setLanguage, t };
 

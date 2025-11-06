@@ -461,6 +461,14 @@ function App() {
     } catch (e) { console.error("Failed to parse data from localStorage", e); localStorage.clear(); }
   }, []);
 
+  useEffect(() => {
+    // On mount, check if an API key exists. If not, prompt the user.
+    // This is crucial for deployed environments where process.env.API_KEY is not available.
+    if (!effectiveApiKey) {
+      setIsApiKeyModalOpen(true);
+    }
+  }, [effectiveApiKey]);
+
   const saveHistory = (newHistory: HistoryEntry[]) => { const sorted = newHistory.sort((a, b) => b.timestamp - a.timestamp); setHistory(sorted); localStorage.setItem('plantHistory', JSON.stringify(sorted)); };
   const saveHerbarium = (newHerbarium: HistoryEntry[]) => { setHerbarium(newHerbarium); localStorage.setItem('plantHerbarium', JSON.stringify(newHerbarium)); };
   const handleImageSelect = useCallback((file: File) => { handleReset(); const src = URL.createObjectURL(file); setImage({ file, src, mimeType: file.type }); }, []);
@@ -495,7 +503,10 @@ function App() {
         const { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
         handleProcessResult({ id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined });
     } catch (err: any) {
-        const errorMessage = err.message || t('unexpectedError'); setError(errorMessage);
+        const errorMessage = err.message === 'IMAGE_GENERATION_FAILED' 
+            ? t('imageGenerationError') 
+            : (err.message || t('unexpectedError'));
+        setError(errorMessage);
         if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('resource has been exhausted') || errorMessage.toLowerCase().includes('api key not valid')) { setIsApiKeyModalOpen(true); }
     } finally { setIsLoading(false); setIsTextSearching(false); }
   };
