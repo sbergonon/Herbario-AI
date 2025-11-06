@@ -1,5 +1,13 @@
 
 
+export interface ToxicityInfo {
+  descripcion: string;
+  nivelToxicidad: 'None' | 'Low' | 'Medium' | 'High' | 'Lethal';
+  compuestosToxicos: string[];
+  sistemasAfectados: string[];
+  primerosAuxilios: string;
+}
+
 export interface Preparation {
   nombre: string;
   ingredientes: string[];
@@ -21,6 +29,11 @@ export interface SimilarActivePlant {
   principioActivoCompartido: string;
 }
 
+export interface ActiveCompound {
+  nombre: string;
+  usos: string;
+}
+
 export interface PlantInfo {
   nombreComun: string;
   nombreCientifico: string;
@@ -32,8 +45,8 @@ export interface PlantInfo {
   conservationStatus: string;
   usosMedicinales: string[];
   usosCulinarios: string[];
-  principiosActivos: string[];
-  toxicidad: string;
+  principiosActivos: ActiveCompound[];
+  toxicidad: ToxicityInfo;
   preparaciones: Preparation[];
   plantasSimilares: SimilarPlant[];
   plantasConPrincipiosActivosSimilares: SimilarActivePlant[];
@@ -76,7 +89,7 @@ export interface HistoryEntry {
   sources: GroundingSource[];
   mapaDistribucionSrc?: string; // Optional data URL for the map
   careGuide?: CareGuideInfo; // Optional care guide
-  imageError?: boolean;
+  imageGenerationFailed?: boolean;
 }
 
 export interface ComparisonInfo {

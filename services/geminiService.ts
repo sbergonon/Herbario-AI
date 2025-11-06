@@ -1,7 +1,7 @@
 
 
 import { GoogleGenAI, GroundingChunk, Type, Modality } from "@google/genai";
-import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from '../types';
+import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from '../types';
 
 if (!process.env.API_KEY) {
   // This check is now less critical as the key is passed in, but good for fallback awareness.
@@ -26,9 +26,9 @@ Eres un experto botánico y herbolario. ${context}. Después de identificarla, p
 - Para "conservationStatus", proporciona el estado de conservación según la UICN (p. ej., 'Preocupación Menor', 'Vulnerable', 'En Peligro') y una breve explicación si es relevante. Si no está evaluada, indícalo.
 - Para "usosMedicinales", proporciona una lista de usos tradicionales y modernos.
 - Para "usosCulinarios", proporciona una lista de strings. Cada string debe ser una descripción detallada de un uso culinario. Si no tiene usos culinarios conocidos, devuelve una lista vacía [].
-- Para "principiosActivos", lista los componentes químicos clave responsables de sus efectos (p. ej., 'Aconitina'). Esta lista no debe estar vacía si la planta es conocida por sus propiedades medicinales o toxicidad. Menciona si se usan en medicamentos comerciales.
-- Para "toxicidad", describe claramente cualquier riesgo, parte tóxica, y a quién afecta (humanos, mascotas). Si no es tóxica, indícalo.
-- Para "preparaciones", genera una lista de recetas o métodos de preparación. Para cada preparación, incluye un objeto con las claves "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", y "contextoHistorico".
+- Para "principiosActivos", genera una lista de objetos. Cada objeto debe tener las claves "nombre" (el nombre del compuesto químico, p.ej., 'Aconitina') y "usos" (una descripción breve de sus principales aplicaciones o efectos, p.ej., 'Analgésico potente, pero altamente tóxico'). Esta lista no debe estar vacía si la planta es conocida por sus propiedades medicinales o toxicidad.
+- Para "toxicidad", proporciona un objeto con las claves "descripcion", "nivelToxicidad" (uno de: 'None', 'Low', 'Medium', 'High', 'Lethal'), "compuestosToxicos" (lista de strings), "sistemasAfectados" (lista de strings, p.ej. 'Sistema nervioso', 'Sistema digestivo'), y "primerosAuxilios" (instrucciones claras y concisas).
+- Para "preparaciones", genera una lista de recetas o métodos de preparación. Para cada preparación, incluye un objeto con las claves "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", y "contextoHistorico". Para "dosis", si no se conoce una dosis específica, indica 'Consultar a un profesional'.
 - Para "plantasSimilares", proporciona una lista de 1 a 3 plantas con las que se confunde comúnmente. Para cada una, incluye un objeto con "nombreComun", "nombreCientifico", y "diferenciaClave".
 - Para "plantasConPrincipiosActivosSimilares", proporciona una lista de 1 a 3 plantas que compartan un principio activo clave. Para cada una, incluye un objeto con "nombreComun", "nombreCientifico" y "principioActivoCompartido".
 
@@ -91,9 +91,9 @@ You are an expert botanist and herbalist. ${context}. After identifying it, prov
 - For "conservationStatus", provide the IUCN conservation status (e.g., 'Least Concern', 'Vulnerable'). If not assessed, state that.
 - For "usosMedicinales", provide a list of traditional and modern uses.
 - For "usosCulinarios", provide a list of strings, each being a detailed description of a culinary use. If not edible, return an empty list [].
-- For "principiosActivos", list the key chemical components responsible for its effects (e.g., 'Aconitine'). This list must not be empty if the plant is known for its medicinal properties or toxicity. Mention if they are used in commercial drugs.
-- For "toxicidad", clearly describe any risks, toxic parts, and who it affects (humans, pets). If not toxic, state that.
-- For "preparaciones", generate a list of preparation methods. For each, include an object with "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", and "contextoHistorico".
+- For "principiosActivos", generate a list of objects. Each object must have the keys "nombre" (the name of the chemical compound, e.g., 'Aconitine') and "usos" (a brief description of its main applications or effects, e.g., 'Potent analgesic, but highly toxic'). This list must not be empty if the plant is known for its medicinal properties or toxicity.
+- For "toxicidad", provide an object with the keys "descripcion", "nivelToxicidad" (one of: 'None', 'Low', 'Medium', 'High', 'Lethal'), "compuestosToxicos" (list of strings), "sistemasAfectados" (list of strings, e.g., 'Nervous system', 'Digestive system'), and "primerosAuxilios" (clear and concise instructions).
+- For "preparaciones", generate a list of preparation methods. For each, include an object with "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", and "contextoHistorico". For "dosis", if a specific dosage is unknown, state 'Consult a professional'.
 - For "plantasSimilares", provide a list of 1-3 commonly confused plants. For each, include an object with "nombreComun", "nombreCientifico", and "diferenciaClave".
 - For "plantasConPrincipiosActivosSimilares", provide a list of 1-3 plants that share a key active compound. For each, include an object with "nombreComun", "nombreCientifico", and "principioActivoCompartido".
 
@@ -153,6 +153,28 @@ const diseaseInfoSchema = { /* ... (schema remains the same) ... */ };
 function sanitizePlantInfo(data: any): PlantInfo | null {
     if (!data || typeof data !== 'object') return null;
     if (data.error) return null;
+
+    const toxData = data.toxicidad && typeof data.toxicidad === 'object' ? data.toxicidad : {};
+    const sanitizedToxicity: ToxicityInfo = {
+        descripcion: String(toxData.descripcion || (typeof data.toxicidad === 'string' ? data.toxicidad : 'Toxicity information not available.')),
+        nivelToxicidad: ['None', 'Low', 'Medium', 'High', 'Lethal'].includes(toxData.nivelToxicidad) ? toxData.nivelToxicidad : 'Low',
+        compuestosToxicos: Array.isArray(toxData.compuestosToxicos) ? toxData.compuestosToxicos.filter((c: any) => typeof c === 'string') : [],
+        sistemasAfectados: Array.isArray(toxData.sistemasAfectados) ? toxData.sistemasAfectados.filter((s: any) => typeof s === 'string') : [],
+        primerosAuxilios: String(toxData.primerosAuxilios || 'Seek immediate medical attention if ingestion or adverse reaction is suspected.'),
+    };
+
+    const sanitizedPrincipiosActivos: ActiveCompound[] = [];
+    if (Array.isArray(data.principiosActivos)) {
+        for (const p of data.principiosActivos) {
+            if (p && typeof p === 'object' && typeof p.nombre === 'string' && typeof p.usos === 'string') {
+                sanitizedPrincipiosActivos.push({
+                    nombre: p.nombre,
+                    usos: p.usos,
+                });
+            }
+        }
+    }
+
     const sanitized: PlantInfo = {
         nombreComun: String(data.nombreComun || 'Name not available'),
         nombreCientifico: String(data.nombreCientifico || 'Scientific name not available'),
@@ -162,10 +184,10 @@ function sanitizePlantInfo(data: any): PlantInfo | null {
         distribucionGeografica: String(data.distribucionGeografica || 'Geographic distribution not available.'),
         floweringSeason: String(data.floweringSeason || 'Flowering season not available.'),
         conservationStatus: String(data.conservationStatus || 'Not assessed.'),
-        toxicidad: String(data.toxicidad || 'Toxicity information not available.'),
+        toxicidad: sanitizedToxicity,
         usosMedicinales: Array.isArray(data.usosMedicinales) ? data.usosMedicinales.filter((u: any) => typeof u === 'string') : [],
         usosCulinarios: Array.isArray(data.usosCulinarios) ? data.usosCulinarios.filter((u: any) => typeof u === 'string') : [],
-        principiosActivos: Array.isArray(data.principiosActivos) ? data.principiosActivos.filter((p: any) => typeof p === 'string') : [],
+        principiosActivos: sanitizedPrincipiosActivos,
         preparaciones: [],
         plantasSimilares: [],
         plantasConPrincipiosActivosSimilares: [],
@@ -177,7 +199,7 @@ function sanitizePlantInfo(data: any): PlantInfo | null {
                     nombre: String(p.nombre || 'Unnamed Preparation'),
                     ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes.filter((i: any) => typeof i === 'string') : [],
                     instrucciones: String(p.instrucciones || 'No instructions.'),
-                    dosis: String(p.dosis || 'Dosage not specified.'),
+                    dosis: String(p.dosis || ''),
                     efectosSecundarios: String(p.efectosSecundarios || 'No known side effects reported.'),
                     contextoHistorico: String(p.contextoHistorico || 'No historical context.'),
                 };
@@ -399,7 +421,7 @@ export const identifyPlantFromText = async (
   apiKey: string,
   plantName: string,
   language: 'es' | 'en'
-): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null }> => {
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null; mapaDistribucionSrc: string | null; imageGenerationFailed: boolean }> => {
     const context = language === 'es' ? `Busca información sobre la planta llamada "${plantName}"` : `Find information about the plant named "${plantName}"`;
     const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
     const textPart = { text: promptGenerator(context) };
@@ -407,8 +429,9 @@ export const identifyPlantFromText = async (
 
     const imageSrc = await generatePlantImage(apiKey, plantInfo, language);
     const mapaDistribucionSrc = await generateDistributionMap(apiKey, plantInfo, language);
+    const imageGenerationFailed = imageSrc === null;
 
-    return { plantInfo, sources, imageSrc, mapaDistribucionSrc };
+    return { plantInfo, sources, imageSrc, mapaDistribucionSrc, imageGenerationFailed };
 };
 
 export const diagnosePlantDiseaseFromImage = async (

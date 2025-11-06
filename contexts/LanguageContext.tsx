@@ -37,8 +37,8 @@ const esTranslations = {
   "conservation": "Conservación",
   "distributionMap": "Mapa de Distribución Geográfica",
   "culinaryUses": "Usos Culinarios",
-  "activeCompounds": "Principios Activos",
-  "similarPlants": "Plantas Similares y Advertencias",
+  "activeCompounds": "Principios Activos y sus Usos",
+  "similarPlants": "Plantas con las que se confunde (¡cuidado!)",
   "preparationsAndRecipes": "Preparaciones y Recetas",
   "share": "Compartir",
   "copied": "Copiado",
@@ -122,7 +122,21 @@ const esTranslations = {
   "airPurification": "Purificación del Aire",
   "petSafety": "Seguridad para Mascotas",
   "funFact": "Dato Curioso",
-  "appManual": "Manual de la App"
+  "appManual": "Manual de la App",
+  "imageGenerationFailedWarning": "No se pudo generar la imagen. Esto puede ocurrir si la clave de API no tiene permisos para el modelo de generación de imágenes.",
+  "toxicityLevel": "Nivel de Toxicidad",
+  "toxicCompounds": "Compuestos Tóxicos",
+  "affectedSystems": "Sistemas Afectados",
+  "firstAid": "Primeros Auxilios",
+  "toxicityLevel_None": "Ninguna",
+  "toxicityLevel_Low": "Baja",
+  "toxicityLevel_Medium": "Media",
+  "toxicityLevel_High": "Alta",
+  "toxicityLevel_Lethal": "Letal",
+  "exportToPdf": "Exportar a PDF",
+  "exporting": "Exportando...",
+  "dosageNotSpecified": "Dosis no especificada. Consultar a un profesional.",
+  "savedToHerbarium": "¡Guardado en tu Herbario!"
 };
 
 const enTranslations = {
@@ -162,7 +176,7 @@ const enTranslations = {
   "conservation": "Conservation",
   "distributionMap": "Geographic Distribution Map",
   "culinaryUses": "Culinary Uses",
-  "activeCompounds": "Active Compounds",
+  "activeCompounds": "Active Compounds and Their Uses",
   "similarPlants": "Similar Plants and Warnings",
   "preparationsAndRecipes": "Preparations and Recipes",
   "share": "Share",
@@ -247,7 +261,21 @@ const enTranslations = {
   "airPurification": "Air Purification",
   "petSafety": "Pet Safety",
   "funFact": "Fun Fact",
-  "appManual": "App Manual"
+  "appManual": "App Manual",
+  "imageGenerationFailedWarning": "Could not generate the image. This can happen if the API key does not have permissions for the image generation model.",
+  "toxicityLevel": "Toxicity Level",
+  "toxicCompounds": "Toxic Compounds",
+  "affectedSystems": "Affected Systems",
+  "firstAid": "First Aid",
+  "toxicityLevel_None": "None",
+  "toxicityLevel_Low": "Low",
+  "toxicityLevel_Medium": "Medium",
+  "toxicityLevel_High": "High",
+  "toxicityLevel_Lethal": "Lethal",
+  "exportToPdf": "Export to PDF",
+  "exporting": "Exporting...",
+  "dosageNotSpecified": "Dosage not specified. Consult a professional.",
+  "savedToHerbarium": "Saved to your Herbarium!"
 };
 
 type Language = 'es' | 'en';

@@ -50,6 +50,16 @@ const ManualContentEs: React.FC = () => (
           <li>Para <strong>Diagnosticar</strong>: Sube una foto de la planta afectada.</li>
           <li>Para <strong>Remedio</strong>: Escribe un síntoma o uso y, opcionalmente, activa la geolocalización para obtener resultados locales.</li>
         </ul>
+         <div className="mt-4 p-4 bg-green-50 dark:bg-emerald-900/40 border border-green-200 dark:border-emerald-800 rounded-lg text-base">
+            <h4 className="font-semibold text-lg text-green-800 dark:text-emerald-300 mb-2">Consejos para la Mejor Foto de Identificación</h4>
+            <ul className="list-disc list-inside space-y-1">
+                <li><strong>Enfócate en una característica clave:</strong> En lugar de fotografiar toda la planta, toma un primer plano nítido de una parte distintiva (una flor, una hoja, un fruto).</li>
+                <li><strong>Buena iluminación, sin sombras:</strong> La luz natural y difusa es ideal. Evita el sol directo que crea sombras fuertes y la oscuridad que produce fotos borrosas.</li>
+                <li><strong>Fondo simple:</strong> Aísla la planta de otras para evitar confusiones. Si puedes, usa el cielo o tu mano como fondo.</li>
+                <li><strong>Una sola planta por foto:</strong> Asegúrate de que solo la planta que quieres identificar aparezca en el encuadre.</li>
+                <li><strong>Enfoque perfecto:</strong> Una foto borrosa no servirá. Toca la pantalla de tu móvil para enfocar la parte más importante de la planta.</li>
+            </ul>
+        </div>
       </li>
       <li><strong className="font-semibold">Analizar</strong>: La IA procesará tu solicitud y devolverá una ficha de información detallada.</li>
       <li><strong className="font-semibold">Explora</strong>: Navega por las diferentes secciones del resultado.</li>
@@ -115,6 +125,16 @@ const ManualContentEn: React.FC = () => (
                     <li>For <strong>Diagnose</strong>: Upload a photo of the affected plant.</li>
                     <li>For <strong>Remedy</strong>: Type a symptom or use and optionally enable geolocation for local results.</li>
                 </ul>
+                <div className="mt-4 p-4 bg-green-50 dark:bg-emerald-900/40 border border-green-200 dark:border-emerald-800 rounded-lg text-base">
+                    <h4 className="font-semibold text-lg text-green-800 dark:text-emerald-300 mb-2">Tips for the Best Identification Photo</h4>
+                    <ul className="list-disc list-inside space-y-1">
+                        <li><strong>Focus on a key feature:</strong> Instead of photographing the whole plant, get a sharp close-up of a distinctive part (a flower, a leaf, a fruit).</li>
+                        <li><strong>Good lighting, no shadows:</strong> Natural, diffused light is ideal. Avoid direct sun that creates harsh shadows and darkness that results in blurry photos.</li>
+                        <li><strong>Simple background:</strong> Isolate the plant from others to avoid confusion. If you can, use the sky or your hand as a background.</li>
+                        <li><strong>One plant per photo:</strong> Make sure only the plant you want to identify appears in the frame.</li>
+                        <li><strong>Perfect focus:</strong> A blurry photo won't work. Tap your phone's screen to focus on the most important part of the plant.</li>
+                    </ul>
+                </div>
             </li>
             <li><strong className="font-semibold">Analyze</strong>: The AI will process your request and return a detailed information card.</li>
             <li><strong className="font-semibold">Explore</strong>: Navigate through the different sections of the result.</li>
