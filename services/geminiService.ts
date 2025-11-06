@@ -1,4 +1,4 @@
-import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
+import { GoogleGenAI, GroundingChunk, Type, Modality } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from '../types';
 
 if (!process.env.API_KEY) {
@@ -312,17 +312,21 @@ async function generateDistributionMap(apiKey: string, plantInfo: PlantInfo, lan
             ? `Mapa del mundo estilo atlas que muestra la distribución geográfica de ${plantInfo.nombreCientifico}. Descripción: "${plantInfo.distribucionGeografica}". Resalta claramente las áreas mencionadas.`
             : `Atlas-style world map showing the geographic distribution of ${plantInfo.nombreCientifico}. Description: "${plantInfo.distribucionGeografica}". Clearly highlight the mentioned areas on the map.`;
 
-        const imageResponse = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: prompt_text,
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt_text }] },
             config: {
-                numberOfImages: 1,
-                outputMimeType: 'image/jpeg',
-                aspectRatio: '16:9',
+                responseModalities: [Modality.IMAGE],
             },
         });
-        const base64ImageBytes: string = imageResponse.generatedImages[0].image.imageBytes;
-        return `data:image/jpeg;base64,${base64ImageBytes}`;
+
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64ImageBytes: string = part.inlineData.data;
+                return `data:image/jpeg;base64,${base64ImageBytes}`;
+            }
+        }
+        return null;
     } catch (error) {
         console.error("Error generating distribution map:", error);
         return null;
@@ -368,14 +372,24 @@ export const identifyPlantFromText = async (
         const imagePrompt = language === 'es' 
             ? `Una fotografía realista y botánicamente precisa de ${plantInfo.nombreCientifico} (${plantInfo.nombreComun}), mostrando claramente sus flores y hojas en su hábitat natural.`
             : `A realistic and botanically accurate photograph of ${plantInfo.nombreCientifico} (${plantInfo.nombreComun}), clearly showing its flowers and leaves in its natural habitat.`;
-        const imageResponse = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: imagePrompt,
-            config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '1:1' },
+        
+        const imageResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: imagePrompt }] },
+            config: {
+                responseModalities: [Modality.IMAGE],
+            },
         });
-        const base64ImageBytes: string = imageResponse.generatedImages[0].image.imageBytes;
-        const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
-        return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
+
+        for (const part of imageResponse.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64ImageBytes: string = part.inlineData.data;
+                const imageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
+                return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
+            }
+        }
+        // If loop completes without returning, no image was found
+        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc, imageError: true };
     } catch (error) {
         console.error("Error generating image:", error);
         return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc, imageError: true };
