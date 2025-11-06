@@ -1,0 +1,8 @@
+{
+  "name": "Herbario IA",
+  "description": "An application to identify plants from photos, discover their medicinal uses, active compounds, toxicity, and learn how to prepare them in traditional remedies.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
