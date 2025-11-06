@@ -1,8 +1,10 @@
+
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PlantInfo, GroundingSource, HistoryEntry, Preparation, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo } from './types';
 import { identifyPlantFromImage, identifyPlantFromText, diagnosePlantDiseaseFromImage, comparePlants, findPlantsByUsage, generateCareGuide } from './services/geminiService';
 import { Icon } from './components/Icons';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { ManualModal } from './components/ManualModal';
 import { useApiKey } from './contexts/ApiKeyContext';
 import { useLanguage } from './contexts/LanguageContext';
 
@@ -452,6 +454,7 @@ function App() {
   const [herbarium, setHerbarium] = useState<HistoryEntry[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isHerbariumOpen, setIsHerbariumOpen] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
   const [mainMode, setMainMode] = useState<MainMode>('identify');
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [comparisonPlants, setComparisonPlants] = useState<{ plantA: HistoryEntry | null, plantB: HistoryEntry | null }>({ plantA: null, plantB: null });
@@ -469,16 +472,24 @@ function App() {
 
   useEffect(() => {
     try {
-      const storedHistory = localStorage.getItem('plantHistory');
-      if (storedHistory) setHistory(JSON.parse(storedHistory));
-      const storedHerbarium = localStorage.getItem('plantHerbarium');
-      if (storedHerbarium) setHerbarium(JSON.parse(storedHerbarium));
-    } catch (e) { console.error("Failed to parse data from localStorage", e); localStorage.clear(); }
+        const storedHistory = localStorage.getItem('plantHistory');
+        if (storedHistory) {
+            setHistory(JSON.parse(storedHistory));
+        }
+    } catch (e) {
+        console.error("Failed to load or parse history from localStorage. Data might be corrupt.", e);
+    }
+    try {
+        const storedHerbarium = localStorage.getItem('plantHerbarium');
+        if (storedHerbarium) {
+            setHerbarium(JSON.parse(storedHerbarium));
+        }
+    } catch (e) {
+        console.error("Failed to load or parse herbarium from localStorage. Data might be corrupt.", e);
+    }
   }, []);
 
   useEffect(() => {
-    // On mount, check if an API key exists. If not, prompt the user.
-    // This is crucial for deployed environments where process.env.API_KEY is not available.
     if (!effectiveApiKey) {
       setIsApiKeyModalOpen(true);
     }
@@ -607,10 +618,10 @@ function App() {
             <div className="flex flex-wrap justify-center items-center gap-4">
                 {history.length > 0 && <button onClick={() => setIsHistoryOpen(true)} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="history" className="w-5 h-5" />{t('history')}</button>}
                 {herbarium.length > 0 && <button onClick={() => setIsHerbariumOpen(true)} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="book" className="w-5 h-5" />{t('myHerbarium')}</button>}
-                <a href={language === 'es' ? 'README.es.md' : 'README.md'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
+                <button onClick={() => setIsManualOpen(true)} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
                     <Icon name="help" className="w-5 h-5" />
                     {t('appManual')}
-                </a>
+                </button>
             </div>
         </div>
         );
@@ -623,7 +634,7 @@ function App() {
             setIsLoading(true); setError(null); setComparisonResult(null);
             try {
                 const { plantInfo, sources, imageSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
-                setComparisonPlants(prev => ({ ...prev, plantB: { id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc, type: 'plant', plantInfo, sources } }));
+                setComparisonPlants(prev => ({ ...prev, plantB: { id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc: imageSrc ?? undefined, type: 'plant', plantInfo, sources } }));
             } catch (err: any) { setError(err.message || 'Could not find the plant to compare.'); } finally { setIsLoading(false); }
         };
         const handleGenerateComparison = async () => {
@@ -669,6 +680,7 @@ function App() {
       <ApiKeyModal isOpen={isApiKeyModalOpen} onClose={() => setIsApiKeyModalOpen(false)} onSave={handleReset} />
       <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelectItem={handleViewHistoryItem} onClearHistory={() => saveHistory([])} />
       <HerbariumModal isOpen={isHerbariumOpen} onClose={handleCloseHerbarium} herbarium={filteredAndSortedHerbarium} onSelectItem={handleViewHistoryItem} onRemoveItem={handleRemoveFromHerbarium} onExport={handleExportHerbarium} sortOrder={herbariumSortOrder} onSortOrderChange={(e) => setHerbariumSortOrder(e.target.value)} nameFilter={herbariumNameFilter} onNameFilterChange={(e) => setHerbariumNameFilter(e.target.value)} useFilter={herbariumUseFilter} onUseFilterChange={(e) => setHerbariumUseFilter(e.target.value)} onStartCompare={handleStartCompare} />
+      <ManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
       {view === 'main' ? renderMainView() : renderComparatorView()}
     </main>
   );

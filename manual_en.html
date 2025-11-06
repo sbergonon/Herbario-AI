@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Herbarium - Manual</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-emerald-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+  <div class="max-w-4xl mx-auto p-4 sm:p-8">
+    <h1 class="text-4xl font-extrabold text-green-800 dark:text-emerald-200 mb-4">AI Herbarium</h1>
+    <p class="text-lg leading-relaxed mb-6">AI Herbarium is a modern, mobile-first web application designed for plant enthusiasts. It leverages the power of Google's Gemini AI to identify plants from photos, diagnose diseases, and provide a wealth of information about their uses, properties, and care.</p>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Key Features</h2>
+    <ul class="list-disc list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Multi-Modal Plant Identification</strong>: Identify plants instantly by taking a photo, uploading an image, or searching by name. The app considers geolocation to improve accuracy with local flora.</li>
+      <li><strong class="font-semibold">Plant Disease Diagnosis</strong>: Snap a photo of a sick plant, and the AI will diagnose potential diseases, pests, or nutritional deficiencies, offering organic and chemical treatment options.</li>
+      <li><strong class="font-semibold">Remedy Finder</strong>: Search for plants based on symptoms or traditional uses (e.g., "headache relief"). The search can prioritize plants native to your current location.</li>
+      <li><strong class="font-semibold">Detailed Plant Profiles</strong>: Get comprehensive information for each identified plant, including:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+          <li><strong>Botanical Data</strong>: Scientific name, synonyms, description, habitat, and conservation status.</li>
+          <li><strong>Uses</strong>: Detailed medicinal and culinary applications.</li>
+          <li><strong>Science</strong>: Key active compounds and toxicity warnings.</li>
+          <li><strong>Practical Guides</strong>: Traditional preparation recipes with instructions, dosage, and historical context.</li>
+          <li><strong>Safety</strong>: Clear comparisons with similar-looking toxic plants to avoid confusion.</li>
+          <li><strong>Distribution Map</strong>: An AI-generated map showing the plant's native and naturalized regions.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Comprehensive AI-Generated Care Guides</strong>: Go beyond identification. Generate detailed guides covering:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+            <li>Watering, Light, Soil, Temperature, Fertilization, and Pest Control.</li>
+            <li><strong>Repotting</strong>: Learn when and how to give your plant a new home.</li>
+            <li><strong>Propagation</strong>: Simple instructions to multiply your plants.</li>
+            <li><strong>Bonus Insights</strong>: Discover if your plant purifies the air, if it's safe for pets, and other fun facts.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Botanical Comparator</strong>: A unique tool to compare two different plants side-by-side, analyzing their medicinal uses, active compounds, and toxicity levels.</li>
+      <li><strong class="font-semibold">Personal Herbarium</strong>: Save your favorite or most relevant findings to a personal, filterable, and sortable collection. You can also export your herbarium data to a JSON file.</li>
+      <li><strong class="font-semibold">Session History</strong>: Automatically saves your recent queries for quick access.</li>
+      <li><strong class="font-semibold">Bilingual Interface</strong>: Fully available in both English and Spanish.</li>
+    </ul>
+
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">How to Use</h2>
+    <ol class="list-decimal list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Select a Mode</strong>: Choose between <code>Identify</code>, <code>Diagnose</code>, or <code>Remedy</code>.</li>
+      <li><strong class="font-semibold">Provide Input</strong>:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+          <li>For <strong>Identify</strong>: Take a photo, upload an image, or type the plant's name.</li>
+          <li>For <strong>Diagnose</strong>: Upload a photo of the affected plant.</li>
+          <li>For <strong>Remedy</strong>: Type a symptom or use and optionally enable geolocation for local results.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Analyze</strong>: The AI will process your request and return a detailed information card.</li>
+      <li><strong class="font-semibold">Explore</strong>: Navigate through the different sections of the result.</li>
+      <li><strong class="font-semibold">Generate Care Guide</strong>: If you identified a plant, click the "Generate Care Guide" button to get tailored instructions.</li>
+      <li><strong class="font-semibold">Save &amp; Compare</strong>: Save the plant to your personal Herbarium or use the Compare tool to analyze it against another plant.</li>
+    </ol>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Technology Stack</h2>
+    <ul class="list-disc list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Frontend</strong>: React (with Hooks)</li>
+      <li><strong class="font-semibold">AI</strong>: Google Gemini API (<code>gemini-2.5-flash</code> for analysis, <code>imagen-4.0-generate-001</code> for image generation)</li>
+      <li><strong class="font-semibold">Styling</strong>: Tailwind CSS</li>
+      <li><strong class="font-semibold">Deployment</strong>: Runs directly in the browser using ES modules and an import map.</li>
+    </ul>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Disclaimer</h2>
+    <div class="p-4 bg-yellow-100 dark:bg-yellow-900/40 border-l-4 border-yellow-500 dark:border-yellow-600 text-yellow-800 dark:text-yellow-300 rounded-r-lg">
+        <p>This application is intended for educational and informational purposes only. It is not a substitute for professional medical, veterinary, or botanical advice. Always consult with a qualified expert before consuming any plant or applying any treatment. AI-based identification may not be 100% accurate.</p>
+    </div>
+  </div>
+</body>
+</html>

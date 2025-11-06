@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herbario IA - Manual</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-emerald-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
+  <div class="max-w-4xl mx-auto p-4 sm:p-8">
+    <h1 class="text-4xl font-extrabold text-green-800 dark:text-emerald-200 mb-4">Herbario IA</h1>
+    <p class="text-lg leading-relaxed mb-6">Herbario IA es una aplicación web moderna y orientada a dispositivos móviles, diseñada para entusiastas de las plantas. Utiliza el poder de la IA de Gemini de Google para identificar plantas a partir de fotos, diagnosticar enfermedades y proporcionar una gran cantidad of información sobre sus usos, propiedades y cuidados.</p>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Características Principales</h2>
+    <ul class="list-disc list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Identificación Multimodal de Plantas</strong>: Identifica plantas al instante tomando una foto, subiendo una imagen o buscando por nombre. La aplicación tiene en cuenta la geolocalización para mejorar la precisión con la flora local.</li>
+      <li><strong class="font-semibold">Diagnóstico de Enfermedades de Plantas</strong>: Toma una foto de una planta enferma y la IA diagnosticará posibles enfermedades, plagas o deficiencias nutricionales, ofreciendo opciones de tratamiento orgánico y químico.</li>
+      <li><strong class="font-semibold">Buscador de Remedios</strong>: Busca plantas basándote en síntomas o usos tradicionales (p. ej., "alivio para el dolor de cabeza"). La búsqueda puede priorizar plantas nativas de tu ubicación actual.</li>
+      <li><strong class="font-semibold">Perfiles Detallados de Plantas</strong>: Obtén información completa para cada planta identificada, incluyendo:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+          <li><strong>Datos Botánicos</strong>: Nombre científico, sinónimos, descripción, hábitat y estado de conservación.</li>
+          <li><strong>Usos</strong>: Aplicaciones medicinales y culinarias detalladas.</li>
+          <li><strong>Ciencia</strong>: Compuestos activos clave y advertencias de toxicidad.</li>
+          <li><strong>Guías Prácticas</strong>: Recetas de preparación tradicionales con instrucciones, dosis y contexto histórico.</li>
+          <li><strong>Seguridad</strong>: Comparaciones claras con plantas tóxicas de apariencia similar para evitar confusiones.</li>
+          <li><strong>Mapa de Distribución</strong>: Un mapa generado por IA que muestra las regiones nativas y naturalizadas de la planta.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Guías de Cuidado Completas Generadas por IA</strong>: Ve más allá de la identificación. Genera guías detalladas que cubren:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+            <li>Riego, Luz, Suelo, Temperatura, Fertilización y Control de Plagas.</li>
+            <li><strong>Trasplante</strong>: Aprende cuándo y cómo darle a tu planta un nuevo hogar.</li>
+            <li><strong>Propagación</strong>: Instrucciones sencillas para multiplicar tus plantas.</li>
+            <li><strong>Consejos Adicionales</strong>: Descubre si tu planta purifica el aire, si es segura para mascotas y otros datos curiosos.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Comparador Botánico</strong>: Una herramienta única para comparar dos plantas diferentes una al lado de la otra, analizando sus usos medicinales, compuestos activos y niveles de toxicidad.</li>
+      <li><strong class="font-semibold">Herbario Personal</strong>: Guarda tus hallazgos favoritos o más relevantes en una colección personal, filtrable y ordenable. También puedes exportar los datos de tu herbario a un archivo JSON.</li>
+      <li><strong class="font-semibold">Historial de Sesión</strong>: Guarda automáticamente tus consultas recientes para un acceso rápido.</li>
+      <li><strong class="font-semibold">Interfaz Bilingüe</strong>: Totalmente disponible en español e inglés.</li>
+    </ul>
+
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Cómo Usar</h2>
+    <ol class="list-decimal list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Selecciona un Modo</strong>: Elige entre <code>Identificar</code>, <code>Diagnosticar</code> o <code>Remedio</code>.</li>
+      <li><strong class="font-semibold">Proporciona la Entrada</strong>:
+        <ul class="list-['-_'] list-inside space-y-2 mt-2 pl-6">
+          <li>Para <strong>Identificar</strong>: Toma una foto, sube una imagen o escribe el nombre de la planta.</li>
+          <li>Para <strong>Diagnosticar</strong>: Sube una foto de la planta afectada.</li>
+          <li>Para <strong>Remedio</strong>: Escribe un síntoma o uso y, opcionalmente, activa la geolocalización para obtener resultados locales.</li>
+        </ul>
+      </li>
+      <li><strong class="font-semibold">Analizar</strong>: La IA procesará tu solicitud y devolverá una ficha de información detallada.</li>
+      <li><strong class="font-semibold">Explora</strong>: Navega por las diferentes secciones del resultado.</li>
+      <li><strong class="font-semibold">Generar Guía de Cuidado</strong>: Si has identificado una planta, haz clic en el botón "Generar Guía de Cuidado" para obtener instrucciones personalizadas.</li>
+      <li><strong class="font-semibold">Guarda y Compara</strong>: Guarda la planta en tu Herbario personal o usa la herramienta de Comparar para analizarla frente a otra planta.</li>
+    </ol>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Pila Tecnológica</h2>
+    <ul class="list-disc list-inside space-y-3 mb-6 text-lg">
+      <li><strong class="font-semibold">Frontend</strong>: React (con Hooks)</li>
+      <li><strong class="font-semibold">IA</strong>: Google Gemini API (<code>gemini-2.5-flash</code> para análisis, <code>imagen-4.0-generate-001</code> para generación de imágenes)</li>
+      <li><strong class="font-semibold">Estilos</strong>: Tailwind CSS</li>
+      <li><strong class="font-semibold">Despliegue</strong>: Se ejecuta directamente en el navegador usando módulos ES y un <code>import map</code>.</li>
+    </ul>
+    
+    <h2 class="text-3xl font-bold text-green-900 dark:text-emerald-200 mt-8 mb-4 border-b border-gray-300 dark:border-slate-700 pb-2">Descargo de Responsabilidad</h2>
+    <div class="p-4 bg-yellow-100 dark:bg-yellow-900/40 border-l-4 border-yellow-500 dark:border-yellow-600 text-yellow-800 dark:text-yellow-300 rounded-r-lg">
+        <p>Esta aplicación está destinada únicamente a fines educativos e informativos. No sustituye el consejo profesional médico, veterinario o botánico. Consulta siempre a un experto cualificado antes de consumir cualquier planta o aplicar cualquier tratamiento. La identificación basada en IA puede no ser 100% precisa.</p>
+    </div>
+  </div>
+</body>
+</html>

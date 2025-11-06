@@ -24,7 +24,7 @@ Eres un experto botánico y herbolario. ${context}. Después de identificarla, p
 - Para "conservationStatus", proporciona el estado de conservación según la UICN (p. ej., 'Preocupación Menor', 'Vulnerable', 'En Peligro') y una breve explicación si es relevante. Si no está evaluada, indícalo.
 - Para "usosMedicinales", proporciona una lista de usos tradicionales y modernos.
 - Para "usosCulinarios", proporciona una lista de strings. Cada string debe ser una descripción detallada de un uso culinario. Si no tiene usos culinarios conocidos, devuelve una lista vacía [].
-- Para "principiosActivos", lista los componentes químicos clave y menciona si se usan en medicamentos comerciales.
+- Para "principiosActivos", lista los componentes químicos clave responsables de sus efectos (p. ej., 'Aconitina'). Esta lista no debe estar vacía si la planta es conocida por sus propiedades medicinales o toxicidad. Menciona si se usan en medicamentos comerciales.
 - Para "toxicidad", describe claramente cualquier riesgo, parte tóxica, y a quién afecta (humanos, mascotas). Si no es tóxica, indícalo.
 - Para "preparaciones", genera una lista de recetas o métodos de preparación. Para cada preparación, incluye un objeto con las claves "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", y "contextoHistorico".
 - Para "plantasSimilares", proporciona una lista de 1 a 3 plantas con las que se confunde comúnmente. Para cada una, incluye un objeto con "nombreComun", "nombreCientifico", y "diferenciaClave".
@@ -89,7 +89,7 @@ You are an expert botanist and herbalist. ${context}. After identifying it, prov
 - For "conservationStatus", provide the IUCN conservation status (e.g., 'Least Concern', 'Vulnerable'). If not assessed, state that.
 - For "usosMedicinales", provide a list of traditional and modern uses.
 - For "usosCulinarios", provide a list of strings, each being a detailed description of a culinary use. If not edible, return an empty list [].
-- For "principiosActivos", list key chemical components.
+- For "principiosActivos", list the key chemical components responsible for its effects (e.g., 'Aconitine'). This list must not be empty if the plant is known for its medicinal properties or toxicity. Mention if they are used in commercial drugs.
 - For "toxicidad", clearly describe any risks, toxic parts, and who it affects (humans, pets). If not toxic, state that.
 - For "preparaciones", generate a list of preparation methods. For each, include an object with "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", and "contextoHistorico".
 - For "plantasSimilares", provide a list of 1-3 commonly confused plants. For each, include an object with "nombreComun", "nombreCientifico", and "diferenciaClave".
