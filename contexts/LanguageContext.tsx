@@ -123,7 +123,8 @@ const esTranslations = {
   "petSafety": "Seguridad para Mascotas",
   "funFact": "Dato Curioso",
   "appManual": "Manual de la App",
-  "imageGenerationError": "Se encontró la información de la planta, pero no se pudo generar una imagen. Esto suele ocurrir si el modelo Imagen no está habilitado en el proyecto de tu clave de API. Por favor, comprueba la configuración de tu proyecto en Google AI Studio."
+  "imageGenerationError": "Se encontró la información de la planta, pero no se pudo generar una imagen. Esto suele ocurrir si el modelo Imagen no está habilitado en el proyecto de tu clave de API. Por favor, comprueba la configuración de tu proyecto en Google AI Studio.",
+  "imagePlaceholderText": "Imagen no generada"
 };
 
 const enTranslations = {
@@ -249,7 +250,8 @@ const enTranslations = {
   "petSafety": "Pet Safety",
   "funFact": "Fun Fact",
   "appManual": "App Manual",
-  "imageGenerationError": "Plant information was found, but an image could not be generated. This often happens if the Imagen model is not enabled for your API key's project. Please check your Google AI Studio project settings."
+  "imageGenerationError": "Plant information was found, but an image could not be generated. This often happens if the Imagen model is not enabled for your API key's project. Please check your Google AI Studio project settings.",
+  "imagePlaceholderText": "Image not generated"
 };
 
 type Language = 'es' | 'en';

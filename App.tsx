@@ -29,6 +29,21 @@ const blobUrlToDataUrl = (blobUrl: string): Promise<string> => new Promise((reso
   }).catch(reject);
 });
 
+// Helper function to create a placeholder SVG image
+const createPlaceholderImage = (text: string): string => {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300" style="background-color:#e2e8f0;">
+      <g transform="translate(150, 130)">
+        <path fill="#94a3b8" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" transform="scale(4) translate(-12, -12)"/>
+      </g>
+      <text x="150" y="220" font-family="sans-serif" font-size="18" fill="#475569" text-anchor="middle" dominant-baseline="middle">${text}</text>
+    </svg>
+  `.trim();
+  const base64Svg = btoa(svg.replace(/\n/g, ''));
+  return `data:image/svg+xml;base64,${base64Svg}`;
+};
+
+
 // --- SUB-COMPONENTS ---
 
 const SearchInput: React.FC<{ onSearch: (query: string) => void; isLoading: boolean; placeholder?: string; }> = ({ onSearch, isLoading, placeholder }) => {
@@ -500,12 +515,13 @@ function App() {
     handleReset(); setIsLoading(true); setIsTextSearching(true);
     if (!effectiveApiKey) { setError(t('apiKeyError')); setIsApiKeyModalOpen(true); setIsLoading(false); return; }
     try {
-        const { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
+        let { plantInfo, sources, imageSrc, mapaDistribucionSrc } = await identifyPlantFromText(effectiveApiKey, query, language);
+        if (imageSrc === null) {
+          imageSrc = createPlaceholderImage(t('imagePlaceholderText'));
+        }
         handleProcessResult({ id: `${Date.now()}-${plantInfo.nombreCientifico}`, timestamp: Date.now(), imageSrc, type: 'plant', plantInfo, sources, mapaDistribucionSrc: mapaDistribucionSrc ?? undefined });
     } catch (err: any) {
-        const errorMessage = err.message === 'IMAGE_GENERATION_FAILED' 
-            ? t('imageGenerationError') 
-            : (err.message || t('unexpectedError'));
+        const errorMessage = err.message || t('unexpectedError');
         setError(errorMessage);
         if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('resource has been exhausted') || errorMessage.toLowerCase().includes('api key not valid')) { setIsApiKeyModalOpen(true); }
     } finally { setIsLoading(false); setIsTextSearching(false); }

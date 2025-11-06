@@ -32,14 +32,14 @@ Eres un experto botánico y herbolario. ${context}. Después de identificarla, p
 
 Si no puedes identificar la planta con certeza, responde con un objeto JSON que contenga solo una clave: "error", con el valor "No se pudo identificar la planta.".
 
-La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio, explicaciones adicionales, ni markdown como \`\`\`json.
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.** Si no hay información para un campo de tipo array (como 'sinonimos'), devuelve una lista vacía []. Si no hay información para un campo de tipo string, devuelve una cadena vacía '' o un valor descriptivo como 'No disponible'. No omitas ninguna clave.
 `;
 
 const generateDiseaseJsonPrompt_es = (context: string) => `
 Eres un experto fitopatólogo y agrónomo. ${context}. Analiza la imagen para identificar la enfermedad, plaga o deficiencia nutricional más probable. Proporciona la siguiente información en un objeto JSON estructurado con las siguientes claves EXACTAS: "nombreEnfermedad", "plantaAfectada", "sintomas", "causas", "tratamientoOrganico", "tratamientoQuimico", "prevencion".
 
 - Si no puedes identificar el problema con certeza, responde con un objeto JSON que contenga solo una clave: "error", con el valor "No se pudo diagnosticar el problema de la planta.".
-La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown.
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.** Si no hay información para un campo de tipo array, devuelve una lista vacía [].
 `;
 
 const generateCompareJsonPrompt_es = (plantA: PlantInfo, plantB: PlantInfo) => `
@@ -53,7 +53,7 @@ Eres un botánico comparativo y farmacólogo experto. Compara la Planta A y la P
 Planta A: ${plantA.nombreComun} (${plantA.nombreCientifico})
 Planta B: ${plantB.nombreComun} (${plantB.nombreCientifico})
 
-La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown.
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.**
 `;
 
 const generateFindPlantsPrompt_es = (usage: string, location: { latitude: number; longitude: number } | null) => {
@@ -61,7 +61,7 @@ const generateFindPlantsPrompt_es = (usage: string, location: { latitude: number
   if (location) {
     prompt += ` Prioriza plantas nativas de la región alrededor de la latitud ${location.latitude} y longitud ${location.longitude}.`;
   }
-  prompt += `\nLa respuesta DEBE ser un array JSON de objetos, cada uno con claves "nombreComun" y "relevancia". No incluyas markdown.
+  prompt += `\nLa respuesta DEBE ser un array JSON de objetos, cada uno con claves "nombreComun" y "relevancia", las cuales son obligatorias. No incluyas markdown.
   Ejemplo: [{"nombreComun": "Manzanilla", "relevancia": "Conocida por sus propiedades calmantes y digestivas."}]`;
   return prompt;
 };
@@ -74,7 +74,7 @@ La respuesta DEBE ser un objeto JSON con las siguientes claves EXACTAS: "riego",
 - Para "propagacion", incluye "metodos", "instrucciones" y "consejo".
 - Para "consejosAdicionales", incluye "purificacionAire" (si la planta purifica el aire), "seguridadMascotas" (si es segura para mascotas y niños) y "datoCurioso".
 - Sé específico y da consejos prácticos para un jardinero aficionado.
-La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown.
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.**
 `;
 
 // --- ENGLISH PROMPTS ---
@@ -97,14 +97,14 @@ You are an expert botanist and herbalist. ${context}. After identifying it, prov
 
 If you cannot identify the plant with certainty, respond with a JSON object containing only one key: "error", with the value "Could not identify the plant.".
 
-The response MUST be only the JSON object, without introductory text, additional explanations, or markdown like \`\`\`json.
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.** If there's no information for an array-type field (like 'sinonimos'), return an empty list []. If there's no information for a string-type field, return an empty string '' or a descriptive value like 'Not available'. Do not omit any keys.
 `;
 
 const generateDiseaseJsonPrompt_en = (context: string) => `
 You are an expert plant pathologist and agronomist. ${context}. Analyze the image to identify the most likely disease, pest, or nutritional deficiency. Provide the following information in a structured JSON object with the following EXACT keys: "nombreEnfermedad", "plantaAfectada", "sintomas", "causas", "tratamientoOrganico", "tratamientoQuimico", "prevencion".
 
 - If you cannot identify the problem with certainty, respond with a JSON object containing only one key: "error", with the value "Could not diagnose the plant problem.".
-The response MUST be only the JSON object, without introductory text or markdown.
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.** If there is no information for an array-type field, return an empty list [].
 `;
 
 const generateCompareJsonPrompt_en = (plantA: PlantInfo, plantB: PlantInfo) => `
@@ -118,7 +118,7 @@ You are an expert comparative botanist and pharmacologist. Compare Plant A and P
 Plant A: ${plantA.nombreComun} (${plantA.nombreCientifico})
 Plant B: ${plantB.nombreComun} (${plantB.nombreCientifico})
 
-The response MUST be only the JSON object, without introductory text or markdown.
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.**
 `;
 
 const generateFindPlantsPrompt_en = (usage: string, location: { latitude: number; longitude: number } | null) => {
@@ -126,7 +126,7 @@ const generateFindPlantsPrompt_en = (usage: string, location: { latitude: number
   if (location) {
     prompt += ` Prioritize plants native to the region around latitude ${location.latitude} and longitude ${location.longitude}.`;
   }
-  prompt += `\nThe response MUST be a JSON array of objects, each with keys "nombreComun" and "relevancia". Do not include markdown.
+  prompt += `\nThe response MUST be a JSON array of objects, each with keys "nombreComun" and "relevancia", which are mandatory. Do not include markdown.
   Example: [{"nombreComun": "Chamomile", "relevancia": "Known for its calming and digestive properties."}]`;
   return prompt;
 };
@@ -139,7 +139,7 @@ The response MUST be a JSON object with the following EXACT keys: "riego", "luz"
 - For "propagacion" (propagation), include "metodos", "instrucciones", and "consejo".
 - For "consejosAdicionales" (additional tips), include "purificacionAire" (if the plant purifies air), "seguridadMascotas" (if it's safe for pets and children), and "datoCurioso" (fun fact).
 - Be specific and provide practical tips for an amateur gardener.
-The response MUST be only the JSON object, without introductory text or markdown.
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.**
 `;
 
 
@@ -356,7 +356,7 @@ export const identifyPlantFromText = async (
   apiKey: string,
   plantName: string,
   language: 'es' | 'en'
-): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string, mapaDistribucionSrc: string | null }> => {
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null, mapaDistribucionSrc: string | null }> => {
     const context = language === 'es' ? `Busca información sobre la planta llamada "${plantName}"` : `Find information about the plant named "${plantName}"`;
     const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
     const textPart = { text: promptGenerator(context) };
@@ -378,7 +378,7 @@ export const identifyPlantFromText = async (
         return { plantInfo, sources, imageSrc: imageUrl, mapaDistribucionSrc };
     } catch (error) {
         console.error("Error generating image:", error);
-        throw new Error("IMAGE_GENERATION_FAILED");
+        return { plantInfo, sources, imageSrc: null, mapaDistribucionSrc };
     }
 };
 
