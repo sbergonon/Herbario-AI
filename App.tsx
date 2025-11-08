@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PlantInfo, GroundingSource, HistoryEntry, Preparation, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from './types';
 import { identifyPlantFromImage, identifyPlantFromText, diagnosePlantDiseaseFromImage, comparePlants, findPlantsByUsage, generateCareGuide, findLocalPlants } from './services/geminiService';
@@ -28,6 +26,7 @@ const triggerHapticFeedback = (pattern: number | number[] = 50) => {
 
 type MainMode = 'identify' | 'diagnose' | 'remedy' | 'discover';
 type AppView = 'main' | 'comparator';
+type Theme = 'light' | 'dark';
 
 const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -470,28 +469,26 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
                     )}
                 </div>
                 <div className="md:w-2/3">
-                     <div className="flex justify-between items-start">
-                        <div className="min-w-0">
-                            <h2 className="text-3xl sm:text-4xl font-extrabold text-green-800 dark:text-emerald-200 break-words">{plantInfo.nombreComun}</h2>
-                            <p className="text-lg sm:text-xl text-gray-500 dark:text-slate-400 italic mt-1 break-words">{plantInfo.nombreCientifico}</p>
-                            {plantInfo.sinonimos?.length > 0 && <p className="text-sm text-gray-600 dark:text-slate-300 mt-2 break-words"><strong>{t('alsoKnownAs')}:</strong> {plantInfo.sinonimos.join(', ')}</p>}
-                        </div>
-                         <div className="flex-shrink-0 ml-4 flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                            <button onClick={handleShareAsImage} disabled={isSharing} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
-                                {isSharing ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="share-up" className="w-4 h-4" />}
-                                {isSharing ? t('sharing') : t('share')}
-                            </button>
-                            {onStartCompare && (<button onClick={() => { onStartCompare(); triggerHapticFeedback(); }} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"><Icon name="compare" className="w-4 h-4" />{t('compare')}</button>)}
-                            <button onClick={onToggleHerbarium} className={`hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${ isInHerbarium ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-500 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600' }`}><Icon name="bookmark" className="w-4 h-4" />{isInHerbarium ? t('saved') : t('save')}</button>
-                            <button onClick={handleExportPdf} disabled={isExporting} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
-                                {isExporting ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="download" className="w-4 h-4" />}
-                                {isExporting ? t('exporting') : t('exportToPdf')}
-                            </button>
-                        </div>
+                    <div className="mb-4">
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-green-800 dark:text-emerald-200 break-words">{plantInfo.nombreComun}</h2>
+                        <p className="text-lg sm:text-xl text-gray-500 dark:text-slate-400 italic mt-1 break-words">{plantInfo.nombreCientifico}</p>
+                        {plantInfo.sinonimos?.length > 0 && <p className="text-sm text-gray-600 dark:text-slate-300 mt-2 break-words"><strong>{t('alsoKnownAs')}:</strong> {plantInfo.sinonimos.join(', ')}</p>}
                     </div>
-                    <div className="mt-4">
-                      <ToxicityMeter level={plantInfo.toxicidad.nivelToxicidad} />
+
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <button onClick={handleShareAsImage} disabled={isSharing} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
+                            {isSharing ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="share-up" className="w-4 h-4" />}
+                            {isSharing ? t('sharing') : t('share')}
+                        </button>
+                        {onStartCompare && (<button onClick={() => { onStartCompare(); triggerHapticFeedback(); }} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"><Icon name="compare" className="w-4 h-4" />{t('compare')}</button>)}
+                        <button onClick={onToggleHerbarium} className={`hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${ isInHerbarium ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-500 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600' }`}><Icon name="bookmark" className="w-4 h-4" />{isInHerbarium ? t('saved') : t('save')}</button>
+                        <button onClick={handleExportPdf} disabled={isExporting} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
+                            {isExporting ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="download" className="w-4 h-4" />}
+                            {isExporting ? t('exporting') : t('exportToPdf')}
+                        </button>
                     </div>
+
+                    <ToxicityMeter level={plantInfo.toxicidad.nivelToxicidad} />
                     <p className="text-gray-700 dark:text-slate-300 leading-relaxed mt-4 break-words">{plantInfo.descripcionGeneral}</p>
                     <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                         <div className="p-4 bg-green-50 dark:bg-emerald-900/40 rounded-lg"><Icon name="globe" className="w-8 h-8 text-green-600 dark:text-emerald-500 mx-auto mb-2" /><h4 className="font-semibold text-sm text-green-800 dark:text-emerald-300">{t('habitat')}</h4><p className="text-sm text-gray-600 dark:text-slate-400 break-words">{plantInfo.habitat}</p></div>
@@ -647,7 +644,15 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium,
   );
 };
 
-const DiseaseResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHerbarium, onToggleHerbarium }) => {
+// Fix: Defined a separate props interface for DiseaseResultCard to avoid type errors.
+interface DiseaseResultCardProps {
+  result: HistoryEntry;
+  onReset: () => void;
+  isInHerbarium: boolean;
+  onToggleHerbarium: () => void;
+}
+
+const DiseaseResultCard: React.FC<DiseaseResultCardProps> = ({ result, onReset, isInHerbarium, onToggleHerbarium }) => {
     const { diseaseInfo, imageSrc } = result;
     const { t } = useLanguage();
     const resultCardRef = useRef<HTMLDivElement>(null);
@@ -713,19 +718,17 @@ const DiseaseResultCard: React.FC<ResultCardProps> = ({ result, onReset, isInHer
                 <div className="md:flex md:gap-8">
                     <div className="md:w-1/3 mb-6 md:mb-0"><img src={imageSrc} alt={`Plant with ${diseaseInfo.nombreEnfermedad}`} className="rounded-xl shadow-lg w-full object-cover aspect-square"/></div>
                     <div className="md:w-2/3">
-                        <div className="flex justify-between items-start">
-                             <div className="min-w-0">
-                                <h2 className="text-3xl sm:text-4xl font-extrabold text-green-800 dark:text-emerald-200 break-words">{diseaseInfo.nombreEnfermedad}</h2>
-                                {diseaseInfo.plantaAfectada.length > 0 && <p className="text-md text-gray-500 dark:text-slate-400 mt-1 break-words">{t('commonlyAffects')}: {diseaseInfo.plantaAfectada.join(', ')}</p>}
-                            </div>
-                            <div className="flex-shrink-0 ml-4 flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                                <button disabled={true} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500 cursor-not-allowed"><Icon name="compare" className="w-4 h-4" />{t('compare')}</button>
-                                <button onClick={onToggleHerbarium} className={`hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${ isInHerbarium ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-500 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}><Icon name="bookmark" className="w-4 h-4" />{isInHerbarium ? t('saved') : t('save')}</button>
-                                <button onClick={handleExportPdf} disabled={isExporting} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
-                                    {isExporting ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="download" className="w-4 h-4" />}
-                                    {isExporting ? t('exporting') : t('exportToPdf')}
-                                </button>
-                            </div>
+                        <div className="mb-4">
+                            <h2 className="text-3xl sm:text-4xl font-extrabold text-green-800 dark:text-emerald-200 break-words">{diseaseInfo.nombreEnfermedad}</h2>
+                            {diseaseInfo.plantaAfectada.length > 0 && <p className="text-md text-gray-500 dark:text-slate-400 mt-1 break-words">{t('commonlyAffects')}: {diseaseInfo.plantaAfectada.join(', ')}</p>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button disabled={true} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500 cursor-not-allowed"><Icon name="compare" className="w-4 h-4" />{t('compare')}</button>
+                            <button onClick={onToggleHerbarium} className={`hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${ isInHerbarium ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 focus:ring-amber-500 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}><Icon name="bookmark" className="w-4 h-4" />{isInHerbarium ? t('saved') : t('save')}</button>
+                            <button onClick={handleExportPdf} disabled={isExporting} className="hide-on-export inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 disabled:opacity-50">
+                                {isExporting ? <span className="w-4 h-4 border-2 border-t-transparent border-current rounded-full animate-spin"></span> : <Icon name="download" className="w-4 h-4" />}
+                                {isExporting ? t('exporting') : t('exportToPdf')}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -875,7 +878,7 @@ const DiscoveryView: React.FC<{ onSelectPlant: (plantName: string) => void; onSe
             <div>
                 <h3 className="font-semibold text-lg text-gray-700 dark:text-slate-300 mb-3">{t('plantsNearYou')}</h3>
                 {localPlantsStatus === 'idle' && !localPlants && (
-                    <button onClick={handleFindLocalPlants} className="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    <button onClick={handleFindLocalPlants} className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
                         <Icon name="globe" className="w-5 h-5" />
                         {t('findLocalPlantsButton')}
                     </button>
@@ -927,6 +930,16 @@ function App() {
   const [remedyQuery, setRemedyQuery] = useState('');
   const [isGeneratingCareGuide, setIsGeneratingCareGuide] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  });
   
   const { effectiveApiKey } = useApiKey();
   const { t, language, setLanguage } = useLanguage();
@@ -934,6 +947,21 @@ function App() {
   const [herbariumSortOrder, setHerbariumSortOrder] = useState('date-desc');
   const [herbariumNameFilter, setHerbariumNameFilter] = useState('');
   const [herbariumUseFilter, setHerbariumUseFilter] = useState('');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    triggerHapticFeedback();
+  };
+
 
   useEffect(() => {
     try {
@@ -1173,14 +1201,9 @@ function App() {
 
         return (
         <div className="flex flex-col items-center gap-4">
-            {!showDiscovery && <MainInput onImageSelect={handleImageSelect} isLoading={isLoading} onTextSearch={handleTextSearch} onRemedySearch={handleRemedySearch} onError={setError} mode={mainMode} onModeChange={setMainMode} />}
-            {showDiscovery && <DiscoveryView onSelectPlant={handleTextSearch} onSelectCategory={(category) => handleRemedySearch(category, false)} />}
+            {showDiscovery ? <DiscoveryView onSelectPlant={handleTextSearch} onSelectCategory={(category) => handleRemedySearch(category, false)} /> : <MainInput onImageSelect={handleImageSelect} isLoading={isLoading} onTextSearch={handleTextSearch} onRemedySearch={handleRemedySearch} onError={setError} mode={mainMode} onModeChange={setMainMode} />}
             
             <div className="flex flex-wrap justify-center items-center gap-4 mt-4">
-                <button onClick={() => { setMainMode(mainMode === 'discover' ? 'identify' : 'discover'); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
-                    <Icon name={mainMode === 'discover' ? 'search' : 'compass'} className="w-5 h-5" />
-                    {mainMode === 'discover' ? t('backToMainSearch') : t('discover')}
-                </button>
                 {history.length > 0 && <button onClick={() => { setIsHistoryOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="history" className="w-5 h-5" />{t('history')}</button>}
                 {herbarium.length > 0 && <button onClick={() => { setIsHerbariumOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60"><Icon name="book" className="w-5 h-5" />{t('myHerbarium')}</button>}
                 <button onClick={() => { setIsManualOpen(true); triggerHapticFeedback(); }} className="inline-flex items-center justify-center gap-2 px-6 py-2 text-gray-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors bg-white/60 dark:bg-slate-800/60">
@@ -1294,9 +1317,13 @@ function App() {
     <main className="min-h-screen w-full bg-gradient-to-br from-emerald-100 via-green-100 to-lime-200 dark:from-slate-800 dark:via-emerald-950 dark:to-green-950 flex flex-col items-center justify-center p-4 overflow-y-auto relative">
       {notification && <Notification message={notification} onClose={() => setNotification(null)} />}
       <div className="absolute top-4 right-4 z-10">
-        <div className="flex items-center bg-white/60 dark:bg-slate-800/60 rounded-full shadow-md">
-          <button onClick={() => { setLanguage('es'); triggerHapticFeedback(); }} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${language === 'es' ? 'bg-green-600 text-white' : 'text-gray-700 dark:text-slate-300'}`}>ES</button>
-          <button onClick={() => { setLanguage('en'); triggerHapticFeedback(); }} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${language === 'en' ? 'bg-green-600 text-white' : 'text-gray-700 dark:text-slate-300'}`}>EN</button>
+        <div className="flex items-center gap-1 bg-white/60 dark:bg-slate-800/60 p-1 rounded-full shadow-md">
+            <button onClick={() => { setLanguage('es'); triggerHapticFeedback(); }} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${language === 'es' ? 'bg-green-600 text-white' : 'text-gray-700 dark:text-slate-300'}`}>ES</button>
+            <button onClick={() => { setLanguage('en'); triggerHapticFeedback(); }} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${language === 'en' ? 'bg-green-600 text-white' : 'text-gray-700 dark:text-slate-300'}`}>EN</button>
+            <div className="w-px h-5 bg-gray-300 dark:bg-slate-600"></div>
+            <button onClick={toggleTheme} className="p-2 rounded-full text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" aria-label={t('toggleTheme')}>
+                <Icon name={theme === 'light' ? 'moon' : 'sun'} className="w-5 h-5" />
+            </button>
         </div>
       </div>
       <ApiKeyModal isOpen={isApiKeyModalOpen} onClose={() => setIsApiKeyModalOpen(false)} onSave={handleReset} />

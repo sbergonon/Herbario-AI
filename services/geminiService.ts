@@ -1,6 +1,6 @@
 
 
-import { GoogleGenAI, GroundingChunk, Type, Modality } from "@google/genai";
+import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from '../types';
 
 if (!process.env.API_KEY) {
@@ -349,24 +349,20 @@ async function generateDistributionMap(apiKey: string, plantInfo: PlantInfo, lan
             ? `Mapa del mundo estilo atlas que muestra la distribución geográfica de ${plantInfo.nombreCientifico}. Descripción: "${plantInfo.distribucionGeografica}". Resalta claramente las áreas mencionadas.`
             : `Atlas-style world map showing the geographic distribution of ${plantInfo.nombreCientifico}. Description: "${plantInfo.distribucionGeografica}". Clearly highlight the mentioned areas on the map.`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt_text }] },
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt_text,
             config: {
-                responseModalities: [Modality.IMAGE],
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
             },
         });
 
-        const firstCandidate = response?.candidates?.[0];
-        if (firstCandidate?.content?.parts) {
-            for (const part of firstCandidate.content.parts) {
-                if (part.inlineData) {
-                    const base64ImageBytes: string = part.inlineData.data;
-                    const mimeType: string = part.inlineData.mimeType;
-                    return `data:${mimeType};base64,${base64ImageBytes}`;
-                }
-            }
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
         }
+
         return null;
     } catch (error) {
         console.error("Error generating distribution map:", error);
@@ -381,25 +377,21 @@ async function generatePlantImage(apiKey: string, plantInfo: PlantInfo, language
             ? `Fotografía realista y detallada de la planta ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) en su hábitat natural. Descripción: "${plantInfo.descripcionGeneral}".`
             : `Realistic and detailed photograph of the plant ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) in its natural habitat. Description: "${plantInfo.descripcionGeneral}".`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt_text }] },
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt_text,
             config: {
-                responseModalities: [Modality.IMAGE],
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
             },
         });
 
-        const firstCandidate = response?.candidates?.[0];
-        if (firstCandidate?.content?.parts) {
-            for (const part of firstCandidate.content.parts) {
-                if (part.inlineData) {
-                    const base64ImageBytes: string = part.inlineData.data;
-                    const mimeType: string = part.inlineData.mimeType;
-                    return `data:${mimeType};base64,${base64ImageBytes}`;
-                }
-            }
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
         }
-        return null; // Return null if no image data is found in a successful response.
+        
+        return null;
     } catch (error) {
         console.error("Graceful Error: Could not generate plant image. This is expected if the image model is not enabled for the API key. Falling back to placeholder.", error);
         return null; // Return null on any error to allow fallback.

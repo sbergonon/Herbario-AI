@@ -160,7 +160,8 @@ const esTranslations = {
   "unicos": "Únicos",
   "unicosPlantaA": "Únicos de {plantName}",
   "unicosPlantaB": "Únicos de {plantName}",
-  "apariencia": "Apariencia"
+  "apariencia": "Apariencia",
+  "toggleTheme": "Cambiar tema"
 };
 
 const enTranslations = {
@@ -323,7 +324,8 @@ const enTranslations = {
   "unicos": "Unique",
   "unicosPlantaA": "Unique to {plantName}",
   "unicosPlantaB": "Unique to {plantName}",
-  "apariencia": "Appearance"
+  "apariencia": "Appearance",
+  "toggleTheme": "Toggle theme"
 };
 
 type Language = 'es' | 'en';
