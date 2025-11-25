@@ -5,84 +5,52 @@ import { TRANSLATIONS } from "../constants";
 // Helper to determine if a key looks valid
 const isValidKey = (key: string | undefined): boolean => {
     if (!key) return false;
-    // Basic Google API Key validation: Must start with AIza and be approx 39 chars
     return key.startsWith("AIza") && key.length > 35;
 };
 
 const getApiKey = (): string => {
-  let key: string | undefined = undefined;
-
-  // 1. Try Standard Vite (The correct way)
+  // INTENTO DIRECTO: Acceso literal para asegurar que Vite realice el reemplazo estático.
   // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      key = import.meta.env.VITE_GEMINI_API_KEY;
+  const viteKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (viteKey && isValidKey(viteKey)) {
+    return viteKey;
   }
 
-  // 2. Fallback: Try checking for just "API_KEY" or "GEMINI_API_KEY" in Vite
-  // (Usually Vite blocks this, but custom configs might allow it)
-  // @ts-ignore
-  if (!key && typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      key = import.meta.env.API_KEY || import.meta.env.GEMINI_API_KEY;
-  }
+  // FALLBACKS (Solo si falla el principal)
+  let fallbackKey = "";
+  try {
+     // @ts-ignore
+     if (typeof process !== 'undefined' && process.env) {
+        // @ts-ignore
+        fallbackKey = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "";
+     }
+  } catch (e) {}
 
-  // 3. Fallback: Try process.env (Node/Webpack compatibility mode)
-  // Sometimes Render builds expose variables here depending on the build command
-  if (!key && typeof process !== 'undefined' && process.env) {
-      key = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
-  }
-  
-  // Cleaning: Remove whitespace and accidental quotes
-  key = key ? key.trim().replace(/^['"]|['"]$/g, '') : "";
+  if (fallbackKey && isValidKey(fallbackKey)) return fallbackKey;
 
-  // 1. Check if missing
-  if (!key) {
-      // DIAGNOSTIC LOGIC
-      let debugMsg = "No se detectaron variables.";
-      try {
-          // @ts-ignore
-          if (typeof import.meta !== 'undefined' && import.meta.env) {
-             // @ts-ignore
-             // Get keys that start with VITE_ to show the user what IS available
-             const keys = Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'));
-             if (keys.length > 0) {
-                 debugMsg = `Variables VITE_ detectadas: ${keys.join(', ')}`;
-             } else {
-                 debugMsg = "El objeto import.meta.env existe pero no tiene variables que empiecen por VITE_.";
-             }
-          }
-      } catch (e) {
-          debugMsg = "Error al leer variables de entorno.";
-      }
+  // SI LLEGAMOS AQUÍ, ES UN ERROR.
+  // Recopilamos info de depuración para mostrarla en pantalla.
+  let envDump = "{}";
+  try {
+    // @ts-ignore
+    envDump = JSON.stringify(import.meta.env || {}, null, 2);
+  } catch (e) { envDump = "Error reading env"; }
 
-      throw new Error(`
-        [ERROR: CLAVE NO ENCONTRADA]
-        
-        DIAGNÓSTICO EN VIVO:
-        ${debugMsg}
-        
-        SI 'VITE_GEMINI_API_KEY' NO ESTÁ EN LA LISTA DE ARRIBA:
-        1. Render Dashboard > Environment: ¿Está bien escrita? (Sin espacios, VITE_ al inicio).
-        2. IMPORTANTE: Si cambiaste la variable hace poco, debes ir a "Manual Deploy > Clear build cache & deploy". Vite "cocina" las variables al compilar; si no recompilas limpiando caché, no verá el cambio.
-      `);
-  }
+  throw new Error(`
+    [ERROR CRÍTICO: API KEY NO DETECTADA]
+    
+    La aplicación no recibe la clave 'VITE_GEMINI_API_KEY'.
 
-  // 2. Check if it's a placeholder (The Common Error)
-  if (key.includes("PLACEHOLDER") || key.includes("tu_clave_aqui") || key.startsWith("YOUR_")) {
-      throw new Error(`
-        [ERROR CRÍTICO: ARCHIVO .ENV DETECTADO]
-        La app está leyendo una clave falsa de un archivo local.
-        Asegúrate de haber borrado '.env' o '.env.local' de GitHub.
-      `);
-  }
+    --- DATOS DE DEPURACIÓN (Lo que ve la app) ---
+    ${envDump}
+    ----------------------------------------------
 
-  // 3. Validate format
-  if (!isValidKey(key)) {
-       throw new Error(`La API Key detectada no es válida (Longitud: ${key.length}). Debe empezar por 'AIza'. Revisa que no haya espacios al principio o al final en Render.`);
-  }
-
-  return key;
+    SI EL OBJETO DE ARRIBA ESTÁ VACÍO O NO TIENE TU CLAVE:
+    1. En Render > Environment: Asegúrate de que la clave se llama 'VITE_GEMINI_API_KEY'.
+    2. IMPRESCINDIBLE: Haz un 'Manual Deploy' > 'Clear build cache & deploy'. 
+       (Vite necesita recompilar para 'quemar' la variable dentro del código JS).
+  `);
 };
 
 const getAiClient = () => {
@@ -121,10 +89,8 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
   const modelId = 'gemini-2.5-flash';
   const t = TRANSLATIONS[prefs.language];
 
-  // Get readable labels for the AI context
   let themeLabel = t.themes[prefs.theme].label;
   
-  // Custom Mix Logic
   if (prefs.theme === Theme.CUSTOM) {
     if (prefs.customThemes && prefs.customThemes.length > 0) {
         const subThemeLabels = prefs.customThemes.map(th => t.themes[th].label).join(", ");
@@ -165,12 +131,10 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
     transportInstruction = `Transporte disponible: ${transportLabel}`;
   }
 
-  // Enhanced Date Logic
   let dateContext = "Fecha no especificada. Asume horarios de apertura estándar (primavera/verano).";
   
   if (prefs.startDate) {
       const date = new Date(prefs.startDate);
-      // Determine day of week in Spanish for the prompt context
       const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       const dayName = days[date.getDay()];
       
@@ -181,7 +145,6 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
       1. CALENDARIO REAL: Calcula qué día de la semana cae cada día del itinerario.
       2. CIERRES DE LUNES: Ten en cuenta que el "Museu de les Terres de l'Ebre" y muchos monumentos cierran los LUNES. Si el itinerario incluye un Lunes, programa actividades de naturaleza o exteriores ese día, no museos.
       3. EVENTOS LOCALES: Verifica si la fecha coincide con la "Festa del Mercat a la Plaça" (Mayo), "Festes Majors" (Agosto), "Fira de Mostres" (Diciembre) o jornadas gastronómicas (Carxofa, Arròs). Si coincide, INCLÚYELO como actividad prioritaria.
-      4. HORARIOS ESTACIONALES: Si es invierno, recuerda que anochece pronto (actividades exteriores por la mañana). Si es verano, sugiere evitar horas centrales de calor al aire libre.
       `;
   }
 
@@ -198,23 +161,19 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
 
     REQUISITOS IMPORTANTES:
     1. Alcance Geográfico: ${locationScope}
-    2. Usa nombres oficiales para lugares (monumentos, restaurantes) para facilitar su localización en mapas.
-    3. Sugiere horarios y precios aproximados de entradas a monumentos (ej. Castillo de Miravet, MónNatura, etc.).
-    4. LOGÍSTICA DE TRANSPORTE: Si el medio es Bus o Barco, es vital incluir la dirección física de la parada o el muelle. Para Miravet/Tortosa, especifica claramente cómo conectar.
+    2. Usa nombres oficiales para lugares.
+    3. Sugiere horarios y precios aproximados.
     
     FORMATO DE RESPUESTA OBLIGATORIO:
-    Para permitir que la aplicación procese el itinerario, DEBES estructurar cada paso/actividad usando EXACTAMENTE el siguiente formato delimitado. No uses formato de lista markdown normal para la estructura principal, usa estos bloques:
+    Usa EXACTAMENTE este formato para cada paso:
 
     <<<STEP>>>
-    DAY: [Número de día, ej: 1]
-    TIME: [Momento del día, ej: Mañana / Mediodía / Tarde / Noche (Traducido al idioma destino)]
-    TITLE: [Nombre corto de la actividad o lugar]
-    IMAGE: [Si conoces una URL válida de Wikimedia Commons para este lugar, ponla aquí. Si no, déjalo vacío]
-    DESCRIPTION: [Descripción detallada en el idioma solicitado (${prefs.language}). Incluye por qué visitar, precios, horarios. **Si has detectado que es un día festivo o de cierre (ej. Lunes), menciónalo explícitamente aquí**.]
+    DAY: [Número de día]
+    TIME: [Momento del día]
+    TITLE: [Nombre corto de la actividad]
+    IMAGE: [Dejar vacío]
+    DESCRIPTION: [Descripción detallada]
     <<<END_STEP>>>
-
-    Repite este bloque para cada actividad del itinerario.
-    Asegúrate de cubrir todos los días solicitados.
   `;
 
   try {
@@ -235,7 +194,7 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
             }
           }
         },
-        systemInstruction: `Eres un experto en turismo de las Terres de l'Ebre con conocimiento detallado de horarios de apertura, festivos locales y logística. ${langInstruction}`,
+        systemInstruction: `Eres un experto en turismo de las Terres de l'Ebre. ${langInstruction}`,
         temperature: 0.4,
       },
     });
@@ -252,8 +211,6 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
         const dayMatch = content.match(/DAY:\s*(.*)/);
         const timeMatch = content.match(/TIME:\s*(.*)/);
         const titleMatch = content.match(/TITLE:\s*(.*)/);
-        const imageMatch = content.match(/IMAGE:\s*(.*)/);
-        
         const descParts = content.split(/DESCRIPTION:\s*/);
         const description = descParts.length > 1 ? descParts[1].trim() : "";
 
@@ -263,7 +220,7 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
                 day: dayMatch ? dayMatch[1].trim() : "1",
                 timeOfDay: timeMatch ? timeMatch[1].trim() : "Varios",
                 title: titleMatch ? titleMatch[1].trim() : "Actividad",
-                imageUrl: imageMatch && imageMatch[1].trim().length > 5 ? imageMatch[1].trim() : undefined,
+                imageUrl: undefined,
                 description: description
             });
         }
@@ -274,35 +231,17 @@ export const generateItinerary = async (prefs: UserPreferences): Promise<Itinera
     
     if (chunks) {
       chunks.forEach((chunk: any) => {
-        if (chunk.web) {
-          sources.push({
-            title: chunk.web.title,
-            url: chunk.web.uri,
-            type: 'web'
-          });
-        }
-        if (chunk.maps) {
-           sources.push({
-             title: chunk.maps.title,
-             url: chunk.maps.uri,
-             type: 'map'
-           });
-        }
+        if (chunk.web) sources.push({ title: chunk.web.title, url: chunk.web.uri, type: 'web' });
+        if (chunk.maps) sources.push({ title: chunk.maps.title, url: chunk.maps.uri, type: 'map' });
       });
     }
 
     const uniqueSources = sources.filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i);
 
-    return {
-      markdown: text,
-      steps: steps,
-      sources: uniqueSources
-    };
+    return { markdown: text, steps: steps, sources: uniqueSources };
 
   } catch (error: any) {
     console.error("Error generating itinerary:", error);
-    
-    // Pass through the clean error message from getAiClient if possible
     throw error;
   }
 };
