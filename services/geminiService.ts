@@ -1,11 +1,6 @@
 
-
 import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
 import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from '../types';
-
-if (!process.env.API_KEY) {
-  // This check is now less critical as the key is passed in, but good for fallback awareness.
-}
 
 const getAiClient = (apiKey: string): GoogleGenAI => {
   if (!apiKey) {
@@ -160,9 +155,6 @@ Example: [{"nombreComun": "Dandelion", "relevancia": "Grows commonly in meadows 
 
 // --- SCHEMA & SANITIZERS (Language-agnostic) ---
 
-const plantInfoSchema = { /* ... (schema remains the same) ... */ };
-const diseaseInfoSchema = { /* ... (schema remains the same) ... */ };
-
 function sanitizePlantInfo(data: any): PlantInfo | null {
     if (!data || typeof data !== 'object') return null;
     if (data.error) return null;
@@ -312,8 +304,9 @@ const getPlantInfo = async (apiKey: string, parts: any[], useGrounding: boolean)
       config.responseMimeType = 'application/json';
     }
 
+    // Switched to gemini-2.5-flash for better stability and quota limits
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       contents: { parts },
       config: config,
     });
@@ -458,8 +451,9 @@ export const diagnosePlantDiseaseFromImage = async (
         const promptGenerator = language === 'es' ? generateDiseaseJsonPrompt_es : generateDiseaseJsonPrompt_en;
         const textPart = { text: promptGenerator(context) };
 
+        // Using gemini-2.5-flash for reliability
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, textPart] },
             config: { responseMimeType: 'application/json' },
         });
@@ -507,8 +501,9 @@ export const comparePlants = async (
         const promptGenerator = language === 'es' ? generateCompareJsonPrompt_es : generateCompareJsonPrompt_en;
         const textPart = { text: promptGenerator(plantA, plantB) };
 
+        // Using gemini-2.5-flash for reliability
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: { responseMimeType: 'application/json' },
         });
@@ -550,8 +545,9 @@ export const findPlantsByUsage = async (
         const promptGenerator = language === 'es' ? generateFindPlantsPrompt_es : generateFindPlantsPrompt_en;
         const textPart = { text: promptGenerator(usage, location) };
         
+        // Using gemini-2.5-flash for reliability
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: { responseMimeType: 'application/json' },
         });
@@ -581,8 +577,9 @@ export const findLocalPlants = async (
         const promptGenerator = language === 'es' ? generateLocalPlantsPrompt_es : generateLocalPlantsPrompt_en;
         const textPart = { text: promptGenerator(location) };
         
+        // Using gemini-2.5-flash for reliability
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: { responseMimeType: 'application/json' },
         });
@@ -641,8 +638,9 @@ export const generateCareGuide = async (
         const promptGenerator = language === 'es' ? generateCareGuidePrompt_es : generateCareGuidePrompt_en;
         const textPart = { text: promptGenerator(plant) };
 
+        // Using gemini-2.5-flash for reliability
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: { responseMimeType: 'application/json' },
         });

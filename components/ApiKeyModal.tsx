@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useApiKey } from '../contexts/ApiKeyContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,9 +11,10 @@ interface ApiKeyModalProps {
 }
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave }) => {
-  const { userApiKey, saveApiKey, clearApiKey, isUserProvided, usingSystemKey } = useApiKey();
+  const { userApiKey, saveApiKey, clearApiKey, isUserProvided, usingSystemKey, effectiveApiKey } = useApiKey();
   const { t } = useLanguage();
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     setApiKeyInput(userApiKey || '');
@@ -36,6 +38,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
     }
   };
 
+  // Helper to mask key
+  const maskKey = (key: string | null) => {
+      if (!key) return 'None';
+      if (key.length < 8) return '****';
+      return `****${key.slice(-4)}`;
+  }
+
   const link = `<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">Google AI Studio</a>`;
   const helpText = t('getYourApiKey').replace('{link}', link);
 
@@ -43,7 +52,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
   return (
     <div className="fixed inset-0 bg-black/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div 
-        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 m-4"
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md p-6 m-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -99,6 +108,26 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
         </div>
 
         <p className="mt-4 text-xs text-gray-500 dark:text-slate-400" dangerouslySetInnerHTML={{ __html: helpText }} />
+
+        {/* Debug Section */}
+        <div className="mt-6 border-t border-gray-200 dark:border-slate-700 pt-4">
+            <button 
+                onClick={() => setShowDebug(!showDebug)} 
+                className="text-xs text-gray-400 dark:text-slate-500 flex items-center gap-1 hover:text-gray-600"
+            >
+                <Icon name={showDebug ? 'chevron-down' : 'search'} className="w-3 h-3" />
+                Debug Info
+            </button>
+            
+            {showDebug && (
+                <div className="mt-2 p-2 bg-gray-100 dark:bg-slate-900 rounded text-xs font-mono text-gray-600 dark:text-slate-400 space-y-1">
+                    <p>Active Key: {maskKey(effectiveApiKey)}</p>
+                    <p>Manual Key: {maskKey(userApiKey)}</p>
+                    <p>System Key: {usingSystemKey ? 'Detected' : 'Not Detected'}</p>
+                    <p>Env Key: {effectiveApiKey === userApiKey ? '(Overridden)' : maskKey(effectiveApiKey)}</p>
+                </div>
+            )}
+        </div>
       </div>
     </div>
   );
