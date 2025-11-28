@@ -58,11 +58,16 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
         </p>
 
         {usingSystemKey && !userApiKey && (
-            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
-                <Icon name="shield" className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                    {t('usingSystemKey') || "Using System/Environment API Key"}
-                </span>
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                    <Icon name="shield" className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                        {t('usingSystemKey') || "Using System Key"}
+                    </span>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                    If you still see errors, the system key might be exhausted. Please enter your own key below to override it.
+                </p>
             </div>
         )}
 

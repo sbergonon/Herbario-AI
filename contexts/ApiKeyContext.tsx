@@ -21,7 +21,9 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   try {
     // 1. Check Vite specific variables first.
     if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-      envApiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.API_KEY || '';
+      envApiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || 
+                  (import.meta as any).env.VITE_API_KEY || 
+                  (import.meta as any).env.API_KEY || '';
     }
     
     // 2. Fallback to process.env.
@@ -32,30 +34,32 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     console.debug("Could not read environment variables directly.");
   }
 
+  // Load manually saved key from LocalStorage on mount
   useEffect(() => {
     try {
-      // CRITICAL FIX: If we have a valid VITE_ key in the environment (which implies a fresh deploy/build),
-      // we should prefer it over a potentially stale/broken key stored in localStorage.
-      // This solves the loop where a user updates .env but the app keeps using the old cached key.
-      if (envApiKey && envApiKey.length > 10) {
-          // If local storage has a key, we check if we should clear it to enforce the env key
-          const storedKey = localStorage.getItem('userApiKey');
-          if (storedKey) {
-              console.log("System environment key detected. Clearing manual local storage override to ensure fresh key is used.");
-              localStorage.removeItem('userApiKey');
-              setUserApiKey(null);
-          }
+      const storedKey = localStorage.getItem('userApiKey');
+      if (storedKey) {
+        console.log("Loaded manual API Key from storage.");
+        setUserApiKey(storedKey);
       } else {
-          // Only load from storage if no robust env key is found in the build
-          const storedKey = localStorage.getItem('userApiKey');
-          if (storedKey) {
-            setUserApiKey(storedKey);
-          }
+        console.log("No manual API Key found in storage.");
       }
     } catch (e) {
       console.error("Failed to read userApiKey from localStorage", e);
     }
-  }, [envApiKey]); // Re-run if envApiKey changes (unlikely at runtime, but good for correctness)
+  }, []);
+
+  // Debugging log to see which key is being active
+  const effectiveApiKey = userApiKey || envApiKey;
+  useEffect(() => {
+    if (effectiveApiKey) {
+        const source = userApiKey ? 'Manual (User Override)' : 'System (Environment)';
+        const masked = effectiveApiKey.length > 5 ? `${effectiveApiKey.substring(0, 5)}...` : '***';
+        console.log(`[ApiKeyContext] Active Key Source: ${source}. Key preview: ${masked}`);
+    } else {
+        console.log("[ApiKeyContext] No API Key currently configured.");
+    }
+  }, [effectiveApiKey, userApiKey]);
 
   const saveApiKey = (key: string) => {
     const trimmedKey = key.trim();
@@ -70,10 +74,6 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUserApiKey(null);
   };
   
-  // The effective key logic:
-  // If userApiKey exists (manual override), use it. Otherwise use envApiKey.
-  const effectiveApiKey = userApiKey || envApiKey;
-
   const value: ApiKeyContextState = {
     userApiKey,
     effectiveApiKey,
