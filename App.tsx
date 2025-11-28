@@ -46,15 +46,19 @@ const blobUrlToDataUrl = (blobUrl: string): Promise<string> => new Promise((reso
 
 // Helper function to create a placeholder SVG image
 const createPlaceholderImage = (text: string): string => {
+  const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, "'");
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300" style="background-color:#e2e8f0;">
-      <g transform="translate(150, 130)">
-        <path fill="#94a3b8" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" transform="scale(4) translate(-12, -12)"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+      <rect width="100%" height="100%" fill="#ecfdf5"/>
+      <circle cx="200" cy="180" r="110" fill="#d1fae5"/>
+      <g transform="translate(100, 80) scale(8)">
+        <path stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.106.805.286 1.164m-3.14-1.465A2.25 2.25 0 0 0 6.75 5.25v1.875c0 .597.237 1.17.659 1.591l6.499 6.501c.422.422 1.002.659 1.591.659h1.875a2.25 2.25 0 0 0 2.25-2.25v-1.875a2.25 2.25 0 0 0-.659-1.591L9.25 5.512a2.25 2.25 0 0 0-1.591-.659H6.75a2.25 2.25 0 0 0-2.25 2.25v5.25c0 .621.504 1.125 1.125 1.125h5.25a1.125 1.125 0 0 0 1.125-1.125v-5.25a1.125 1.125 0 0 0-1.125-1.125h-1.5a1.125 1.125 0 0 0-1.125 1.125v1.5a3.375 3.375 0 0 0 6.75 0V9a2.25 2.25 0 0 0-2.25-2.25h-1.5a2.25 2.25 0 0 0-2.25 2.25v1.5" />
       </g>
-      <text x="150" y="220" font-family="sans-serif" font-size="18" fill="#475569" text-anchor="middle" dominant-baseline="middle">${text}</text>
+      <text x="200" y="340" font-family="sans-serif" font-weight="bold" font-size="24" fill="#065f46" text-anchor="middle" dominant-baseline="middle">${safeText}</text>
     </svg>
   `.trim();
-  const base64Svg = btoa(svg.replace(/\n/g, ''));
+  // Fix: Encode URI component to handle UTF-8 characters (like accents) correctly in base64
+  const base64Svg = btoa(unescape(encodeURIComponent(svg.replace(/\n/g, ''))));
   return `data:image/svg+xml;base64,${base64Svg}`;
 };
 
@@ -63,6 +67,12 @@ const createThumbnail = (dataUrl: string, maxSize = 400): Promise<string> => {
     return new Promise((resolve) => {
         if (!dataUrl || !dataUrl.startsWith('data:image')) {
             resolve(dataUrl); // Not an image data URL, return as is.
+            return;
+        }
+
+        // Fix: Skip SVG images to avoid "Failed to load image" errors and unnecessary rasterization.
+        if (dataUrl.startsWith('data:image/svg+xml')) {
+            resolve(dataUrl);
             return;
         }
 
@@ -185,7 +195,7 @@ const MainInput: React.FC<{ onImageSelect: (file: File) => void; isLoading: bool
           </button>
         ))}
       </div>
-      <h2 className="text-2xl font-bold text-green-900 dark:text-emerald-200 mb-2">{t(modeConfig[mode].titleKey)}</h2>
+      <h2 className="text-2xl font-bold text-green-900 dark:text-emerald-200">{t(modeConfig[mode].titleKey)}</h2>
       <p className="text-gray-600 dark:text-slate-400 mb-6">{t(modeConfig[mode].descriptionKey)}</p>
       
       {mode === 'identify' && <SearchInput onSearch={onTextSearch} isLoading={isLoading} placeholder={t('searchByNamePlaceholder')} />}

@@ -1,247 +1,663 @@
-import { GoogleGenAI } from "@google/genai";
-import { UserPreferences, ItineraryResult, GroundingSource, ItineraryStep, Theme, Transport } from "../types";
-import { TRANSLATIONS } from "../constants";
 
-// Helper to determine if a key looks valid
-const isValidKey = (key: string | undefined): boolean => {
-    if (!key) return false;
-    return key.startsWith("AIza") && key.length > 35;
-};
 
-const getApiKey = (): string => {
-  // INTENTO DIRECTO: Acceso literal para asegurar que Vite realice el reemplazo estático.
-  // @ts-ignore
-  const viteKey = import.meta.env.VITE_GEMINI_API_KEY;
+import { GoogleGenAI, GroundingChunk, Type } from "@google/genai";
+import { PlantInfo, GroundingSource, Preparation, SimilarPlant, SimilarActivePlant, DiseaseInfo, ComparisonInfo, SuggestedPlant, CareGuideInfo, ToxicityInfo, ActiveCompound } from '../types';
 
-  if (viteKey && isValidKey(viteKey)) {
-    return viteKey;
+if (!process.env.API_KEY) {
+  // This check is now less critical as the key is passed in, but good for fallback awareness.
+}
+
+const getAiClient = (apiKey: string): GoogleGenAI => {
+  if (!apiKey) {
+    throw new Error("No API key was provided to initialize the AI client.");
   }
-
-  // FALLBACKS (Solo si falla el principal)
-  let fallbackKey = "";
-  try {
-     // @ts-ignore
-     if (typeof process !== 'undefined' && process.env) {
-        // @ts-ignore
-        fallbackKey = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "";
-     }
-  } catch (e) {}
-
-  if (fallbackKey && isValidKey(fallbackKey)) return fallbackKey;
-
-  // SI LLEGAMOS AQUÍ, ES UN ERROR.
-  // Recopilamos info de depuración para mostrarla en pantalla.
-  let envDump = "{}";
-  try {
-    // @ts-ignore
-    envDump = JSON.stringify(import.meta.env || {}, null, 2);
-  } catch (e) { envDump = "Error reading env"; }
-
-  throw new Error(`
-    [ERROR CRÍTICO: API KEY NO DETECTADA]
-    
-    La aplicación no recibe la clave 'VITE_GEMINI_API_KEY'.
-
-    --- DATOS DE DEPURACIÓN (Lo que ve la app) ---
-    ${envDump}
-    ----------------------------------------------
-
-    SI EL OBJETO DE ARRIBA ESTÁ VACÍO O NO TIENE TU CLAVE:
-    1. En Render > Environment: Asegúrate de que la clave se llama 'VITE_GEMINI_API_KEY'.
-    2. IMPRESCINDIBLE: Haz un 'Manual Deploy' > 'Clear build cache & deploy'. 
-       (Vite necesita recompilar para 'quemar' la variable dentro del código JS).
-  `);
-};
-
-const getAiClient = () => {
-  const apiKey = getApiKey();
   return new GoogleGenAI({ apiKey });
 };
 
-export const generateStepImage = async (title: string, description: string): Promise<string | null> => {
-    try {
-        const ai = getAiClient();
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [{ text: `Generate a high quality, photorealistic travel photography image of: ${title} in Amposta, Spain. The image should be bright, inviting, and suitable for a tourist guide. Context: ${description.slice(0, 200)}.` }]
-            },
-            config: {
-                imageConfig: {
-                    aspectRatio: "4:3"
-                }
+// --- SPANISH PROMPTS ---
+
+const generateJsonPrompt_es = (context: string) => `
+Eres un experto botánico y herbolario. ${context}. Después de identificarla, proporciona la siguiente información en un objeto JSON estructurado con las siguientes claves EXACTAS: "nombreComun", "nombreCientifico", "sinonimos", "descripcionGeneral", "habitat", "distribucionGeografica", "floweringSeason", "conservationStatus", "usosMedicinales", "usosCulinarios", "principiosActivos", "toxicidad", "preparaciones", "plantasSimilares" y "plantasConPrincipiosActivosSimilares".
+
+- Para "sinonimos", proporciona una lista de otros nombres comunes por los que se conoce la planta. Si no hay sinónimos comunes, devuelve una lista vacía [].
+- Para "habitat", describe el hábitat natural de la planta (tipo de suelo, clima, región).
+- Para "distribucionGeografica", describe las regiones del mundo donde la planta es nativa y donde ha sido introducida o se ha naturalizado.
+- Para "floweringSeason", indica la estación o meses en que la planta suele florecer.
+- Para "conservationStatus", proporciona el estado de conservación según la UICN (p. ej., 'Preocupación Menor', 'Vulnerable', 'En Peligro') y una breve explicación si es relevante. Si no está evaluada, indícalo.
+- Para "usosMedicinales", proporciona una lista de usos tradicionales y modernos.
+- Para "usosCulinarios", proporciona una lista de strings. Cada string debe ser una descripción detallada de un uso culinario. Si no tiene usos culinarios conocidos, devuelve una lista vacía [].
+- Para "principiosActivos", genera una lista de objetos. Cada objeto debe tener las claves "nombre" (el nombre del compuesto químico, p.ej., 'Aconitina') y "usos" (una descripción breve de sus principales aplicaciones o efectos, p.ej., 'Analgésico potente, pero altamente tóxico'). Esta lista no debe estar vacía si la planta es conocida por sus propiedades medicinales o toxicidad.
+- Para "toxicidad", proporciona un objeto con las claves "descripcion", "nivelToxicidad" (uno de: 'None', 'Low', 'Medium', 'High', 'Lethal'), "compuestosToxicos" (lista de strings), "sistemasAfectados" (lista de strings, p.ej. 'Sistema nervioso', 'Sistema digestivo'), y "primerosAuxilios" (instrucciones claras y concisas).
+- Para "preparaciones", genera una lista de recetas o métodos de preparación. Para cada preparación, incluye un objeto con las claves "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", y "contextoHistorico". Para "dosis", si no se conoce una dosis específica, indica 'Consultar a un profesional'.
+- Para "plantasSimilares", proporciona una lista de 1 a 3 plantas con las que se confunde comúnmente. Para cada una, incluye un objeto con "nombreComun", "nombreCientifico", y "diferenciaClave".
+- Para "plantasConPrincipiosActivosSimilares", proporciona una lista de 1 a 3 plantas que compartan un principio activo clave. Para cada una, incluye un objeto con "nombreComun", "nombreCientifico" y "principioActivoCompartido".
+
+Si no puedes identificar la planta con certeza, responde con un objeto JSON que contenga solo una clave: "error", con el valor "No se pudo identificar la planta.".
+
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.** Si no hay información para un campo de tipo array (como 'sinonimos'), devuelve una lista vacía []. Si no hay información para un campo de tipo string, devuelve una cadena vacía '' o un valor descriptivo como 'No disponible'. No omitas ninguna clave.
+`;
+
+const generateDiseaseJsonPrompt_es = (context: string) => `
+Eres un experto fitopatólogo y agrónomo. ${context}. Analiza la imagen para identificar la enfermedad, plaga o deficiencia nutricional más probable. Proporciona la siguiente información en un objeto JSON estructurado con las siguientes claves EXACTAS: "nombreEnfermedad", "plantaAfectada", "sintomas", "causas", "tratamientoOrganico", "tratamientoQuimico", "prevencion".
+
+- Si no puedes identificar el problema con certeza, responde con un objeto JSON que contenga solo una clave: "error", con el valor "No se pudo diagnosticar el problema de la planta.".
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.** Si no hay información para un campo de tipo array, devuelve una lista vacía [].
+`;
+
+const generateCompareJsonPrompt_es = (plantA: PlantInfo, plantB: PlantInfo) => `
+Eres un botánico comparativo y farmacólogo experto. Compara la Planta A y la Planta B y genera un análisis en un objeto JSON con las claves EXACTAS: "resumenComparativo", "usosMedicinales", "principiosActivos", "toxicidad", y "diferenciasBotanicas".
+
+- "usosMedicinales": Un objeto con "similitudes" y "diferencias".
+- "principiosActivos": Un objeto con "compartidos" y "unicos" (con claves "plantaA" y "plantaB").
+- "toxicidad": Un objeto con "comparacion", "nivelPlantaA", y "nivelPlantaB".
+- "diferenciasBotanicas": Un objeto con "habitat" y "apariencia".
+
+Planta A: ${plantA.nombreComun} (${plantA.nombreCientifico})
+Planta B: ${plantB.nombreComun} (${plantB.nombreCientifico})
+
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.**
+`;
+
+const generateFindPlantsPrompt_es = (usage: string, location: { latitude: number; longitude: number } | null) => {
+  let prompt = `Eres un etnobotánico experto. Basado en la indicación "${usage}", genera una lista de hasta 5 plantas útiles.`;
+  if (location) {
+    prompt += ` Prioriza plantas nativas de la región alrededor de la latitud ${location.latitude} y longitud ${location.longitude}.`;
+  }
+  prompt += `\nLa respuesta DEBE ser un array JSON de objetos, cada uno con claves "nombreComun" y "relevancia", las cuales son obligatorias. No incluyas markdown.
+  Ejemplo: [{"nombreComun": "Manzanilla", "relevancia": "Conocida por sus propiedades calmantes y digestivas."}]`;
+  return prompt;
+};
+
+const generateCareGuidePrompt_es = (plant: PlantInfo) => `
+Eres un horticultor y jardinero experto. Genera una guía de cuidado detallada para la planta "${plant.nombreComun} (${plant.nombreCientifico})".
+La respuesta DEBE ser un objeto JSON con las siguientes claves EXACTAS: "riego", "luz", "suelo", "temperaturaHumedad", "fertilizacion", "podaPestes", "trasplante", "propagacion", y "consejosAdicionales".
+- Cada clave debe contener un objeto con sub-claves que describan el cuidado de forma concisa y práctica.
+- Para "trasplante", incluye "frecuencia", "instrucciones" y "consejo".
+- Para "propagacion", incluye "metodos", "instrucciones" y "consejo".
+- Para "consejosAdicionales", incluye "purificacionAire" (si la planta purifica el aire), "seguridadMascotas" (si es segura para mascotas y niños) y "datoCurioso".
+- Sé específico y da consejos prácticos para un jardinero aficionado.
+La respuesta DEBE ser únicamente el objeto JSON, sin texto introductorio ni markdown. **Todas las claves solicitadas son obligatorias.**
+`;
+
+const generateLocalPlantsPrompt_es = (location: { latitude: number; longitude: number }) => `
+Eres un etnobotánico experto. Basado en la ubicación geográfica (latitud ${location.latitude}, longitud ${location.longitude}), genera una lista de 3 a 4 plantas medicinales comunes y notables nativas o que crecen abundantemente en esa región.
+La respuesta DEBE ser un array JSON de objetos, cada uno con claves "nombreComun" y "relevancia", las cuales son obligatorias. No incluyas markdown.
+Ejemplo: [{"nombreComun": "Diente de León", "relevancia": "Crece comúnmente en praderas y céspedes de la zona, conocido por sus propiedades diuréticas."}]
+`;
+
+
+// --- ENGLISH PROMPTS ---
+
+const generateJsonPrompt_en = (context: string) => `
+You are an expert botanist and herbalist. ${context}. After identifying it, provide the following information in a structured JSON object with the following EXACT keys: "nombreComun", "nombreCientifico", "sinonimos", "descripcionGeneral", "habitat", "distribucionGeografica", "floweringSeason", "conservationStatus", "usosMedicinales", "usosCulinarios", "principiosActivos", "toxicidad", "preparaciones", "plantasSimilares", and "plantasConPrincipiosActivosSimilares".
+
+- For "sinonimos", provide a list of other common names. If none, return an empty list [].
+- For "habitat", describe the natural habitat.
+- For "distribucionGeografica", describe the regions where the plant is native and introduced.
+- For "floweringSeason", indicate the season or months of flowering.
+- For "conservationStatus", provide the IUCN conservation status (e.g., 'Least Concern', 'Vulnerable'). If not assessed, state that.
+- For "usosMedicinales", provide a list of traditional and modern uses.
+- For "usosCulinarios", provide a list of strings, each being a detailed description of a culinary use. If not edible, return an empty list [].
+- For "principiosActivos", generate a list of objects. Each object must have the keys "nombre" (the name of the chemical compound, e.g., 'Aconitine') and "usos" (a brief description of its main applications or effects, e.g., 'Potent analgesic, but highly toxic'). This list must not be empty if the plant is known for its medicinal properties or toxicity.
+- For "toxicidad", provide an object with the keys "descripcion", "nivelToxicidad" (one of: 'None', 'Low', 'Medium', 'High', 'Lethal'), "compuestosToxicos" (list of strings), "sistemasAfectados" (list of strings, e.g., 'Nervous system', 'Digestive system'), and "primerosAuxilios" (clear and concise instructions).
+- For "preparaciones", generate a list of preparation methods. For each, include an object with "nombre", "ingredientes", "instrucciones", "dosis", "efectosSecundarios", and "contextoHistorico". For "dosis", if a specific dosage is unknown, state 'Consult a professional'.
+- For "plantasSimilares", provide a list of 1-3 commonly confused plants. For each, include an object with "nombreComun", "nombreCientifico", and "diferenciaClave".
+- For "plantasConPrincipiosActivosSimilares", provide a list of 1-3 plants that share a key active compound. For each, include an object with "nombreComun", "nombreCientifico", and "principioActivoCompartido".
+
+If you cannot identify the plant with certainty, respond with a JSON object containing only one key: "error", with the value "Could not identify the plant.".
+
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.** If there's no information for an array-type field (like 'sinonimos'), return an empty list []. If there's no information for a string-type field, return an empty string '' or a descriptive value like 'Not available'. Do not omit any keys.
+`;
+
+const generateDiseaseJsonPrompt_en = (context: string) => `
+You are an expert plant pathologist and agronomist. ${context}. Analyze the image to identify the most likely disease, pest, or nutritional deficiency. Provide the following information in a structured JSON object with the following EXACT keys: "nombreEnfermedad", "plantaAfectada", "sintomas", "causas", "tratamientoOrganico", "tratamientoQuimico", "prevencion".
+
+- If you cannot identify the problem with certainty, respond with a JSON object containing only one key: "error", with the value "Could not identify the plant problem.".
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.** If there is no information for an array-type field, return an empty list [].
+`;
+
+const generateCompareJsonPrompt_en = (plantA: PlantInfo, plantB: PlantInfo) => `
+You are an expert comparative botanist and pharmacologist. Compare Plant A and Plant B and generate an analysis in a JSON object with the EXACT keys: "resumenComparativo", "usosMedicinales", "principiosActivos", "toxicidad", and "diferenciasBotanicas".
+
+- "usosMedicinales": An object with "similitudes" and "diferencias".
+- "principiosActivos": An object with "compartidos" and "unicos" (with keys "plantaA" and "plantaB").
+- "toxicidad": An object with "comparacion", "nivelPlantaA", and "nivelPlantaB".
+- "diferenciasBotanicas": An object with "habitat" and "apariencia".
+
+Plant A: ${plantA.nombreComun} (${plantA.nombreCientifico})
+Plant B: ${plantB.nombreComun} (${plantB.nombreCientifico})
+
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.**
+`;
+
+const generateFindPlantsPrompt_en = (usage: string, location: { latitude: number; longitude: number } | null) => {
+  let prompt = `You are an expert ethnobotanist. Based on the indication "${usage}", generate a list of up to 5 useful plants.`;
+  if (location) {
+    prompt += ` Prioritize plants native to the region around latitude ${location.latitude} and longitude ${location.longitude}.`;
+  }
+  prompt += `\nThe response MUST be a JSON array of objects, each with keys "nombreComun" and "relevancia", which are mandatory. Do not include markdown.
+  Example: [{"nombreComun": "Chamomile", "relevancia": "Known for its calming and digestive properties."}]`;
+  return prompt;
+};
+
+const generateCareGuidePrompt_en = (plant: PlantInfo) => `
+You are an expert horticulturist and gardener. Generate a detailed care guide for the plant "${plant.nombreComun} (${plant.nombreCientifico})".
+The response MUST be a JSON object with the following EXACT keys: "riego", "luz", "suelo", "temperaturaHumedad", "fertilizacion", "podaPestes", "trasplante", "propagacion", and "consejosAdicionales".
+- Each key must contain an object with sub-keys describing care concisely and practically.
+- For "trasplante" (repotting), include "frecuencia", "instrucciones", and "consejo".
+- For "propagacion" (propagation), include "metodos", "instrucciones", and "consejo".
+- For "consejosAdicionales" (additional tips), include "purificacionAire" (if the plant purifies air), "seguridadMascotas" (if it's safe for pets and children), and "datoCurioso" (fun fact).
+- Be specific and provide practical tips for an amateur gardener.
+The response MUST be only the JSON object, without introductory text or markdown. **All requested keys are mandatory.**
+`;
+
+const generateLocalPlantsPrompt_en = (location: { latitude: number; longitude: number }) => `
+You are an expert ethnobotanist. Based on the geographic location (latitude ${location.latitude}, longitude ${location.longitude}), generate a list of 3 to 4 common and notable medicinal plants native to or growing abundantly in that region.
+The response MUST be a JSON array of objects, each with "nombreComun" and "relevancia" keys, which are mandatory. Do not include markdown.
+Example: [{"nombreComun": "Dandelion", "relevancia": "Grows commonly in meadows and lawns in the area, known for its diuretic properties."}]
+`;
+
+
+// --- SCHEMA & SANITIZERS (Language-agnostic) ---
+
+const plantInfoSchema = { /* ... (schema remains the same) ... */ };
+const diseaseInfoSchema = { /* ... (schema remains the same) ... */ };
+
+function sanitizePlantInfo(data: any): PlantInfo | null {
+    if (!data || typeof data !== 'object') return null;
+    if (data.error) return null;
+
+    const toxData = data.toxicidad && typeof data.toxicidad === 'object' ? data.toxicidad : {};
+    const sanitizedToxicity: ToxicityInfo = {
+        descripcion: String(toxData.descripcion || (typeof data.toxicidad === 'string' ? data.toxicidad : 'Toxicity information not available.')),
+        nivelToxicidad: ['None', 'Low', 'Medium', 'High', 'Lethal'].includes(toxData.nivelToxicidad) ? toxData.nivelToxicidad : 'Low',
+        compuestosToxicos: Array.isArray(toxData.compuestosToxicos) ? toxData.compuestosToxicos.filter((c: any) => typeof c === 'string') : [],
+        sistemasAfectados: Array.isArray(toxData.sistemasAfectados) ? toxData.sistemasAfectados.filter((s: any) => typeof s === 'string') : [],
+        primerosAuxilios: String(toxData.primerosAuxilios || 'Seek immediate medical attention if ingestion or adverse reaction is suspected.'),
+    };
+
+    const sanitizedPrincipiosActivos: ActiveCompound[] = [];
+    if (Array.isArray(data.principiosActivos)) {
+        for (const p of data.principiosActivos) {
+            if (p && typeof p === 'object' && typeof p.nombre === 'string' && typeof p.usos === 'string') {
+                sanitizedPrincipiosActivos.push({
+                    nombre: p.nombre,
+                    usos: p.usos,
+                });
             }
-        });
-        
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-             if (part.inlineData) {
-                 return `data:image/png;base64,${part.inlineData.data}`;
-             }
         }
+    }
+
+    const sanitized: PlantInfo = {
+        nombreComun: String(data.nombreComun || 'Name not available'),
+        nombreCientifico: String(data.nombreCientifico || 'Scientific name not available'),
+        sinonimos: Array.isArray(data.sinonimos) ? data.sinonimos.filter((s: any) => typeof s === 'string') : [],
+        descripcionGeneral: String(data.descripcionGeneral || 'No description available.'),
+        habitat: String(data.habitat || 'Habitat not available.'),
+        distribucionGeografica: String(data.distribucionGeografica || 'Geographic distribution not available.'),
+        floweringSeason: String(data.floweringSeason || 'Flowering season not available.'),
+        conservationStatus: String(data.conservationStatus || 'Not assessed.'),
+        toxicidad: sanitizedToxicity,
+        usosMedicinales: Array.isArray(data.usosMedicinales) ? data.usosMedicinales.filter((u: any) => typeof u === 'string') : [],
+        usosCulinarios: Array.isArray(data.usosCulinarios) ? data.usosCulinarios.filter((u: any) => typeof u === 'string') : [],
+        principiosActivos: sanitizedPrincipiosActivos,
+        preparaciones: [],
+        plantasSimilares: [],
+        plantasConPrincipiosActivosSimilares: [],
+    };
+    if (Array.isArray(data.preparaciones)) {
+        sanitized.preparaciones = data.preparaciones.map((p: any): Preparation | null => {
+                if (!p || typeof p !== 'object') return null;
+                return {
+                    nombre: String(p.nombre || 'Unnamed Preparation'),
+                    ingredientes: Array.isArray(p.ingredientes) ? p.ingredientes.filter((i: any) => typeof i === 'string') : [],
+                    instrucciones: String(p.instrucciones || 'No instructions.'),
+                    dosis: String(p.dosis || ''),
+                    efectosSecundarios: String(p.efectosSecundarios || 'No known side effects reported.'),
+                    contextoHistorico: String(p.contextoHistorico || 'No historical context.'),
+                };
+            }).filter((p): p is Preparation => p !== null);
+    }
+    if (Array.isArray(data.plantasSimilares)) {
+        sanitized.plantasSimilares = data.plantasSimilares.map((p: any): SimilarPlant | null => {
+                if (!p || typeof p !== 'object' || !p.nombreComun || !p.diferenciaClave) return null;
+                return {
+                    nombreComun: String(p.nombreComun),
+                    nombreCientifico: String(p.nombreCientifico || 'N/A'),
+                    diferenciaClave: String(p.diferenciaClave),
+                };
+            }).filter((p): p is SimilarPlant => p !== null);
+    }
+    if (Array.isArray(data.plantasConPrincipiosActivosSimilares)) {
+        sanitized.plantasConPrincipiosActivosSimilares = data.plantasConPrincipiosActivosSimilares.map((p: any): SimilarActivePlant | null => {
+                if (!p || typeof p !== 'object' || !p.nombreComun || !p.principioActivoCompartido) return null;
+                return {
+                    nombreComun: String(p.nombreComun),
+                    nombreCientifico: String(p.nombreCientifico || 'N/A'),
+                    principioActivoCompartido: String(p.principioActivoCompartido),
+                };
+            }).filter((p): p is SimilarActivePlant => p !== null);
+    }
+    if (sanitized.nombreComun === 'Name not available' && sanitized.nombreCientifico === 'Scientific name not available') {
         return null;
-    } catch (error) {
-        console.error("Image gen error", error);
+    }
+    return sanitized;
+}
+
+function sanitizeDiseaseInfo(data: any): DiseaseInfo | null {
+    if (!data || typeof data !== 'object') return null;
+    if (data.error) return null;
+    const sanitized: DiseaseInfo = {
+        nombreEnfermedad: String(data.nombreEnfermedad || 'Diagnosis not available'),
+        plantaAfectada: Array.isArray(data.plantaAfectada) ? data.plantaAfectada.filter((s: any) => typeof s === 'string') : [],
+        sintomas: Array.isArray(data.sintomas) ? data.sintomas.filter((s: any) => typeof s === 'string') : [],
+        causas: Array.isArray(data.causas) ? data.causas.filter((c: any) => typeof c === 'string') : [],
+        tratamientoOrganico: Array.isArray(data.tratamientoOrganico) ? data.tratamientoOrganico.filter((t: any) => typeof t === 'string') : [],
+        tratamientoQuimico: Array.isArray(data.tratamientoQuimico) ? data.tratamientoQuimico.filter((t: any) => typeof t === 'string') : [],
+        prevencion: Array.isArray(data.prevencion) ? data.prevencion.filter((p: any) => typeof p === 'string') : [],
+    };
+    if (sanitized.nombreEnfermedad === 'Diagnosis not available' || sanitized.sintomas.length === 0) {
         return null;
+    }
+    return sanitized;
+}
+
+
+// --- UTILITY FUNCTIONS ---
+
+const getJsonFromResponse = (text: string) => {
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            try { return JSON.parse(match[1]); } catch (parseError) { throw new Error("Model response contained malformed JSON inside a code block."); }
+        }
+        const startIndex = text.indexOf('{');
+        const endIndex = text.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            const jsonString = text.substring(startIndex, endIndex + 1);
+            try { return JSON.parse(jsonString); } catch (finalParseError) { /* continue to array check */ }
+        }
+        const arrayStartIndex = text.indexOf('[');
+        const arrayEndIndex = text.lastIndexOf(']');
+        if (arrayStartIndex !== -1 && arrayEndIndex !== -1 && arrayEndIndex > arrayStartIndex) {
+            const arrayString = text.substring(arrayStartIndex, arrayEndIndex + 1);
+            try { return JSON.parse(arrayString); } catch (arrayParseError) { throw new Error("Model response is not a valid JSON array. Please try again."); }
+        }
+        throw new Error("Model response is not valid JSON. Please try again.");
     }
 };
 
-export const generateItinerary = async (prefs: UserPreferences): Promise<ItineraryResult> => {
-  const modelId = 'gemini-2.5-flash';
-  const t = TRANSLATIONS[prefs.language];
-
-  let themeLabel = t.themes[prefs.theme].label;
-  
-  if (prefs.theme === Theme.CUSTOM) {
-    if (prefs.customThemes && prefs.customThemes.length > 0) {
-        const subThemeLabels = prefs.customThemes.map(th => t.themes[th].label).join(", ");
-        themeLabel = `ITINERARIO PERSONALIZADO (MIX) que combine elementos de: ${subThemeLabels}. Organiza la ruta mezclando estos temas de forma lógica.`;
-    } else {
-        themeLabel = "Mix General: Lo mejor de Amposta (Historia, Naturaleza y Gastronomía).";
+const handleApiError = (error: unknown) => {
+    console.error("API call error:", error);
+    if (error instanceof Error) {
+        if (error.message.includes('429') || error.message.toLowerCase().includes('resource has been exhausted')) {
+            throw new Error("The free query limit has been reached. Please enter your own API key to continue.");
+        }
+        throw error;
     }
-  }
+    throw new Error("Could not get a response from the model. Please check your query or try again later.");
+};
 
-  const durationLabel = `${prefs.duration} ${prefs.duration === 1 ? t.label_day : t.label_days}`;
-  const transportLabel = t.transports[prefs.transport];
+// --- CORE API FUNCTIONS ---
 
-  let transportInstruction = "";
-  let locationScope = "El itinerario debe centrarse en la ciudad de Amposta y el Delta del Ebro.";
-  let langInstruction = `RESPOND IN ${prefs.language === 'ca' ? 'CATALAN' : prefs.language === 'es' ? 'SPANISH' : 'ENGLISH'}.`;
-
-  if (prefs.transport === Transport.RIVER) {
-    if (prefs.includeUpriver) {
-        transportInstruction = "El usuario desea una experiencia fluvial COMPLETA remontando el río Ebro. OBLIGATORIO: Dedica al menos medio día o un día entero a visitar TORTOSA (Catedral, Castillo de la Suda) o MIRAVET (Castillo Templario, Paso de Barca) llegando en barco o combinando barco/bus si es necesario. IMPRESCINDIBLE: Incluye horarios de salida de barcos desde Amposta, precios aproximados, dirección del embarcadero en Amposta y en destino.";
-        locationScope = "El itinerario debe incluir Amposta y expandirse obligatoriamente río arriba hacia Tortosa o Miravet.";
-    } else {
-        transportInstruction = "El usuario está interesado en transporte fluvial por el Delta. INCLUYE OBLIGATORIAMENTE opciones de cruceros por la desembocadura. IMPRESCINDIBLE: En la descripción de la actividad fluvial, incluye la DIRECCIÓN EXACTA del embarcadero o punto de salida en Amposta.";
-    }
-  } else if (prefs.transport === Transport.BUS) {
-    transportInstruction = "El usuario viaja en Autobús. IMPRESCINDIBLE: Indica claramente la dirección de la Estación de Autobuses de Amposta o las paradas específicas (ubicación de la parada) para llegar a los puntos de interés sugeridos.";
-  } else if (prefs.transport === Transport.TRAIN) {
-    transportInstruction = "El usuario viaja en TREN. IMPRESCINDIBLE: Ten en cuenta que la estación es 'L'Aldea-Amposta-Tortosa' (a unos km del centro). Incluye información sobre cómo llegar del tren al centro (Bus/Taxi) y coordina los tiempos.";
-  } else if (prefs.transport === Transport.BIKE) {
-    transportInstruction = "El usuario se mueve en BICICLETA. Prioriza rutas por carriles bici, caminos rurales del Delta (Caminos de Sirga) y la Vía Verde. Sugiere lugares donde aparcar la bici si es necesario.";
-  } else if (prefs.transport === Transport.MIX) {
-    if (prefs.customTransports && prefs.customTransports.length > 0) {
-        const mixLabels = prefs.customTransports.map(tr => t.transports[tr]).join(", ");
-        transportInstruction = `El usuario utilizará una COMBINACIÓN de transportes personalizada: ${mixLabels}. Para cada desplazamiento del itinerario, especifica explícitamente cuál de estos medios es el más lógico y eficiente (ej. "Ir a pie al castillo", "Tomar el coche para ir al Delta").`;
-    } else {
-        transportInstruction = "El usuario utilizará una combinación óptima de transporte (A pie por el centro, coche o taxi para distancias largas). Sugiere la mejor opción logística para cada tramo.";
-    }
-  } else {
-    transportInstruction = `Transporte disponible: ${transportLabel}`;
-  }
-
-  let dateContext = "Fecha no especificada. Asume horarios de apertura estándar (primavera/verano).";
-  
-  if (prefs.startDate) {
-      const date = new Date(prefs.startDate);
-      const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-      const dayName = days[date.getDay()];
-      
-      dateContext = `
-      FECHA EXACTA DE INICIO: ${prefs.startDate} (${dayName}).
-      
-      LOGÍSTICA TEMPORAL CRÍTICA (OBLIGATORIO):
-      1. CALENDARIO REAL: Calcula qué día de la semana cae cada día del itinerario.
-      2. CIERRES DE LUNES: Ten en cuenta que el "Museu de les Terres de l'Ebre" y muchos monumentos cierran los LUNES. Si el itinerario incluye un Lunes, programa actividades de naturaleza o exteriores ese día, no museos.
-      3. EVENTOS LOCALES: Verifica si la fecha coincide con la "Festa del Mercat a la Plaça" (Mayo), "Festes Majors" (Agosto), "Fira de Mostres" (Diciembre) o jornadas gastronómicas (Carxofa, Arròs). Si coincide, INCLÚYELO como actividad prioritaria.
-      `;
-  }
-
-  const prompt = `
-    Actúa como un guía turístico experto local de Amposta y Terres de l'Ebre (Tarragona, España).
-    Crea un itinerario detallado basado en las siguientes preferencias:
-    
-    - Idioma de respuesta: ${langInstruction}
-    - Tema Principal: ${themeLabel}
-    - Duración: ${durationLabel}
-    - ${dateContext}
-    - ${transportInstruction}
-    ${prefs.additionalInfo ? `- Notas adicionales del usuario: ${prefs.additionalInfo}` : ''}
-
-    REQUISITOS IMPORTANTES:
-    1. Alcance Geográfico: ${locationScope}
-    2. Usa nombres oficiales para lugares.
-    3. Sugiere horarios y precios aproximados.
-    
-    FORMATO DE RESPUESTA OBLIGATORIO:
-    Usa EXACTAMENTE este formato para cada paso:
-
-    <<<STEP>>>
-    DAY: [Número de día]
-    TIME: [Momento del día]
-    TITLE: [Nombre corto de la actividad]
-    IMAGE: [Dejar vacío]
-    DESCRIPTION: [Descripción detallada]
-    <<<END_STEP>>>
-  `;
-
+const getPlantInfo = async (apiKey: string, parts: any[], useGrounding: boolean): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[] }> => {
   try {
-    const ai = getAiClient();
+    const ai = getAiClient(apiKey);
+    const config: any = {};
+    if (useGrounding) {
+      config.tools = [{ googleSearch: {} }];
+    } else {
+      config.responseMimeType = 'application/json';
+    }
+
     const response = await ai.models.generateContent({
-      model: modelId,
-      contents: prompt,
-      config: {
-        tools: [
-            { googleSearch: {} }, 
-            { googleMaps: {} }
-        ],
-        toolConfig: {
-          retrievalConfig: {
-            latLng: {
-              latitude: 40.7130, // Amposta Latitude
-              longitude: 0.5805 // Amposta Longitude
-            }
-          }
-        },
-        systemInstruction: `Eres un experto en turismo de las Terres de l'Ebre. ${langInstruction}`,
-        temperature: 0.4,
-      },
+      model: 'gemini-3-pro-preview',
+      contents: { parts },
+      config: config,
     });
 
-    const text = response.text || "Error generating itinerary.";
-    
-    const steps: ItineraryStep[] = [];
-    const stepRegex = /<<<STEP>>>([\s\S]*?)<<<END_STEP>>>/g;
-    let match;
-    let index = 0;
+    const data = getJsonFromResponse(response.text);
+    if (!data) throw new Error("Could not extract structured information from the model's response.");
+    if (data.error) throw new Error(data.error);
 
-    while ((match = stepRegex.exec(text)) !== null) {
-        const content = match[1];
-        const dayMatch = content.match(/DAY:\s*(.*)/);
-        const timeMatch = content.match(/TIME:\s*(.*)/);
-        const titleMatch = content.match(/TITLE:\s*(.*)/);
-        const descParts = content.split(/DESCRIPTION:\s*/);
-        const description = descParts.length > 1 ? descParts[1].trim() : "";
-
-        if (titleMatch && description) {
-            steps.push({
-                id: `step-${index++}`,
-                day: dayMatch ? dayMatch[1].trim() : "1",
-                timeOfDay: timeMatch ? timeMatch[1].trim() : "Varios",
-                title: titleMatch ? titleMatch[1].trim() : "Actividad",
-                imageUrl: undefined,
-                description: description
-            });
-        }
+    const sanitizedData = sanitizePlantInfo(data);
+    if (!sanitizedData) {
+        throw new Error("The model's response was not in the expected format. The plant may not have been recognized.");
     }
-
-    const sources: GroundingSource[] = [];
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     
-    if (chunks) {
-      chunks.forEach((chunk: any) => {
-        if (chunk.web) sources.push({ title: chunk.web.title, url: chunk.web.uri, type: 'web' });
-        if (chunk.maps) sources.push({ title: chunk.maps.title, url: chunk.maps.uri, type: 'map' });
-      });
-    }
+    const sources: GroundingSource[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: GroundingChunk) => ({
+            uri: chunk.web?.uri || '',
+            title: chunk.web?.title || 'Untitled Source'
+        })).filter(source => source.uri) || [];
 
-    const uniqueSources = sources.filter((v, i, a) => a.findIndex(t => (t.url === v.url)) === i);
-
-    return { markdown: text, steps: steps, sources: uniqueSources };
-
-  } catch (error: any) {
-    console.error("Error generating itinerary:", error);
-    throw error;
+    return { plantInfo: sanitizedData, sources };
+  } catch (error) {
+    handleApiError(error);
+    throw new Error("Unhandled API error");
   }
+};
+
+async function generateDistributionMap(apiKey: string, plantInfo: PlantInfo, language: 'es' | 'en'): Promise<string | null> {
+    if (!plantInfo.distribucionGeografica || plantInfo.distribucionGeografica.includes('no disponible') || plantInfo.distribucionGeografica.includes('not available')) {
+        return null;
+    }
+    try {
+        const ai = getAiClient(apiKey);
+        const prompt_text = language === 'es' 
+            ? `Mapa del mundo estilo atlas que muestra la distribución geográfica de ${plantInfo.nombreCientifico}. Descripción: "${plantInfo.distribucionGeografica}". Resalta claramente las áreas mencionadas.`
+            : `Atlas-style world map showing the geographic distribution of ${plantInfo.nombreCientifico}. Description: "${plantInfo.distribucionGeografica}". Clearly highlight the mentioned areas on the map.`;
+
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt_text,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
+            },
+        });
+
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Error generating distribution map:", error);
+        return null;
+    }
+}
+
+// NOTE: This function is kept for code structure but should be used cautiously 
+// as generative AI often "hallucinates" specific plant details.
+async function generatePlantImage(apiKey: string, plantInfo: PlantInfo, language: 'es' | 'en'): Promise<string | null> {
+    try {
+        const ai = getAiClient(apiKey);
+        const prompt_text = language === 'es'
+            ? `Fotografía realista y detallada de la planta ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) en su hábitat natural. Descripción: "${plantInfo.descripcionGeneral}".`
+            : `Realistic and detailed photograph of the plant ${plantInfo.nombreComun} (${plantInfo.nombreCientifico}) in its natural habitat. Description: "${plantInfo.descripcionGeneral}".`;
+
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt_text,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
+            },
+        });
+
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error("Graceful Error: Could not generate plant image. This is expected if the image model is not enabled for the API key. Falling back to placeholder.", error);
+        return null; // Return null on any error to allow fallback.
+    }
+}
+
+
+export const identifyPlantFromImage = async (
+  apiKey: string,
+  base64Image: string,
+  mimeType: string,
+  location: { latitude: number; longitude: number } | null,
+  language: 'es' | 'en'
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[], mapaDistribucionSrc: string | null }> => {
+  const imagePart = { inlineData: { data: base64Image, mimeType } };
+  let context: string;
+  if (language === 'es') {
+      context = "Identifica la planta en la siguiente imagen";
+      if (location) context += ` y considera que fue encontrada cerca de la latitud ${location.latitude} y longitud ${location.longitude} para mejorar la precisión.`;
+  } else {
+      context = "Identify the plant in the following image";
+      if (location) context += ` and consider it was found near latitude ${location.latitude} and longitude ${location.longitude} to improve accuracy.`;
+  }
+  const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
+  const textPart = { text: promptGenerator(context) };
+  const { plantInfo, sources } = await getPlantInfo(apiKey, [imagePart, textPart], true);
+  const mapaDistribucionSrc = await generateDistributionMap(apiKey, plantInfo, language);
+  return { plantInfo, sources, mapaDistribucionSrc };
+};
+
+export const identifyPlantFromText = async (
+  apiKey: string,
+  plantName: string,
+  language: 'es' | 'en'
+): Promise<{ plantInfo: PlantInfo; sources: GroundingSource[]; imageSrc: string | null; mapaDistribucionSrc: string | null; imageGenerationFailed: boolean }> => {
+    const context = language === 'es' ? `Busca información sobre la planta llamada "${plantName}"` : `Find information about the plant named "${plantName}"`;
+    const promptGenerator = language === 'es' ? generateJsonPrompt_es : generateJsonPrompt_en;
+    const textPart = { text: promptGenerator(context) };
+    const { plantInfo, sources } = await getPlantInfo(apiKey, [textPart], false);
+
+    // CHANGE: Disabled image generation for text searches to avoid hallucinations (e.g. incorrect Jasonia glutinosa).
+    // The app will render a safe SVG placeholder instead.
+    // const imageSrc = await generatePlantImage(apiKey, plantInfo, language);
+    const imageSrc = null; 
+    
+    const mapaDistribucionSrc = await generateDistributionMap(apiKey, plantInfo, language);
+    const imageGenerationFailed = false; // Intentionally skipped, not failed.
+
+    return { plantInfo, sources, imageSrc, mapaDistribucionSrc, imageGenerationFailed };
+};
+
+export const diagnosePlantDiseaseFromImage = async (
+    apiKey: string,
+    base64Image: string,
+    mimeType: string,
+    language: 'es' | 'en'
+): Promise<{ diseaseInfo: DiseaseInfo; sources: GroundingSource[] }> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const imagePart = { inlineData: { data: base64Image, mimeType } };
+        const context = language === 'es' ? "Analiza la siguiente imagen de una planta que parece enferma o dañada." : "Analyze the following image of a plant that appears sick or damaged.";
+        const promptGenerator = language === 'es' ? generateDiseaseJsonPrompt_es : generateDiseaseJsonPrompt_en;
+        const textPart = { text: promptGenerator(context) };
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: { parts: [imagePart, textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("Could not extract structured information from the model's response.");
+        if (data.error) throw new Error(data.error);
+        
+        const sanitizedData = sanitizeDiseaseInfo(data);
+        if (!sanitizedData) {
+            throw new Error("The model's response for the disease was not in the expected format.");
+        }
+        const sources: GroundingSource[] = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: GroundingChunk) => ({
+            uri: chunk.web?.uri || '',
+            title: chunk.web?.title || 'Untitled Source'
+        })).filter(source => source.uri) || [];
+        return { diseaseInfo: sanitizedData, sources };
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled API error in diagnosis");
+    }
+};
+
+function sanitizeComparisonInfo(data: any): ComparisonInfo | null {
+    if (!data || typeof data !== 'object') return null;
+    const getString = (val: any, defaultVal = 'N/A'): string => String(val || defaultVal);
+    const getStringArray = (val: any): string[] => Array.isArray(val) ? val.filter(item => typeof item === 'string') : [];
+    return {
+        resumenComparativo: getString(data.resumenComparativo),
+        usosMedicinales: { similitudes: getStringArray(data.usosMedicinales?.similitudes), diferencias: getStringArray(data.usosMedicinales?.diferencias) },
+        principiosActivos: { compartidos: getStringArray(data.principiosActivos?.compartidos), unicos: { plantaA: getStringArray(data.principiosActivos?.unicos?.plantaA), plantaB: getStringArray(data.principiosActivos?.unicos?.plantaB) } },
+        toxicidad: { comparacion: getString(data.toxicidad?.comparacion), nivelPlantaA: getString(data.toxicidad?.nivelPlantaA, 'N/A'), nivelPlantaB: getString(data.toxicidad?.nivelPlantaB, 'N/A') },
+        diferenciasBotanicas: { habitat: getString(data.diferenciasBotanicas?.habitat), apariencia: getString(data.diferenciasBotanicas?.apariencia) },
+    };
+}
+
+export const comparePlants = async (
+    apiKey: string,
+    plantA: PlantInfo,
+    plantB: PlantInfo,
+    language: 'es' | 'en'
+): Promise<ComparisonInfo> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const promptGenerator = language === 'es' ? generateCompareJsonPrompt_es : generateCompareJsonPrompt_en;
+        const textPart = { text: promptGenerator(plantA, plantB) };
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: { parts: [textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("The model's response for the comparison is empty.");
+        if (data.error) throw new Error(data.error);
+        
+        const sanitizedData = sanitizeComparisonInfo(data);
+        if (!sanitizedData) {
+            throw new Error("Could not process the comparison from the model.");
+        }
+        return sanitizedData;
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled error in plant comparison");
+    }
+};
+
+function sanitizeSuggestedPlants(data: any): SuggestedPlant[] | null {
+  if (!Array.isArray(data)) return null;
+  const sanitized: SuggestedPlant[] = data.map((item: any): SuggestedPlant | null => {
+      if (typeof item === 'object' && item !== null && typeof item.nombreComun === 'string' && typeof item.relevancia === 'string') {
+        return { nombreComun: item.nombreComun, relevancia: item.relevancia };
+      }
+      return null;
+    }).filter((item): item is SuggestedPlant => item !== null);
+  return sanitized.length > 0 ? sanitized : null;
+}
+
+export const findPlantsByUsage = async (
+    apiKey: string,
+    usage: string,
+    location: { latitude: number; longitude: number } | null,
+    language: 'es' | 'en'
+): Promise<SuggestedPlant[]> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const promptGenerator = language === 'es' ? generateFindPlantsPrompt_es : generateFindPlantsPrompt_en;
+        const textPart = { text: promptGenerator(usage, location) };
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: { parts: [textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("The model's response for remedy search is empty.");
+        if (data.error) throw new Error(data.error);
+
+        const sanitizedData = sanitizeSuggestedPlants(data);
+        if (!sanitizedData) {
+            throw new Error("Could not find valid suggestions from the model.");
+        }
+        return sanitizedData;
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled error in remedy search.");
+    }
+};
+
+export const findLocalPlants = async (
+    apiKey: string,
+    location: { latitude: number; longitude: number },
+    language: 'es' | 'en'
+): Promise<SuggestedPlant[]> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const promptGenerator = language === 'es' ? generateLocalPlantsPrompt_es : generateLocalPlantsPrompt_en;
+        const textPart = { text: promptGenerator(location) };
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: { parts: [textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("The model's response for local plants search is empty.");
+        if (data.error) throw new Error(data.error);
+
+        const sanitizedData = sanitizeSuggestedPlants(data);
+        if (!sanitizedData) {
+            throw new Error("Could not find valid local plant suggestions from the model.");
+        }
+        return sanitizedData;
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled error in local plants search.");
+    }
+};
+
+function sanitizeCareGuide(data: any): CareGuideInfo | null {
+    if (!data || typeof data !== 'object') return null;
+    const s = (val: any, defaultVal = 'N/A') => String(val || defaultVal);
+    const getObj = (obj: any) => obj && typeof obj === 'object' ? obj : {};
+    
+    const riego = getObj(data.riego);
+    const luz = getObj(data.luz);
+    const suelo = getObj(data.suelo);
+    const temperaturaHumedad = getObj(data.temperaturaHumedad);
+    const fertilizacion = getObj(data.fertilizacion);
+    const podaPestes = getObj(data.podaPestes);
+    const trasplante = getObj(data.trasplante);
+    const propagacion = getObj(data.propagacion);
+    const consejosAdicionales = getObj(data.consejosAdicionales);
+
+    return {
+        riego: { frecuencia: s(riego.frecuencia), metodo: s(riego.metodo), consejo: s(riego.consejo) },
+        luz: { nivel: s(luz.nivel), ubicacion: s(luz.ubicacion), consejo: s(luz.consejo) },
+        suelo: { tipo: s(suelo.tipo), drenaje: s(suelo.drenaje), consejo: s(suelo.consejo) },
+        temperaturaHumedad: { temperatura: s(temperaturaHumedad.temperatura), humedad: s(temperaturaHumedad.humedad), consejo: s(temperaturaHumedad.consejo) },
+        fertilizacion: { frecuencia: s(fertilizacion.frecuencia), tipo: s(fertilizacion.tipo), consejo: s(fertilizacion.consejo) },
+        podaPestes: { poda: s(podaPestes.poda), pestesComunes: s(podaPestes.pestesComunes), consejo: s(podaPestes.consejo) },
+        trasplante: { frecuencia: s(trasplante.frecuencia), instrucciones: s(trasplante.instrucciones), consejo: s(trasplante.consejo) },
+        propagacion: { metodos: s(propagacion.metodos), instrucciones: s(propagacion.instrucciones), consejo: s(propagacion.consejo) },
+        consejosAdicionales: { purificacionAire: s(consejosAdicionales.purificacionAire), seguridadMascotas: s(consejosAdicionales.seguridadMascotas), datoCurioso: s(consejosAdicionales.datoCurioso) },
+    };
+}
+
+
+export const generateCareGuide = async (
+    apiKey: string,
+    plant: PlantInfo,
+    language: 'es' | 'en'
+): Promise<CareGuideInfo> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const promptGenerator = language === 'es' ? generateCareGuidePrompt_es : generateCareGuidePrompt_en;
+        const textPart = { text: promptGenerator(plant) };
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: { parts: [textPart] },
+            config: { responseMimeType: 'application/json' },
+        });
+
+        const data = getJsonFromResponse(response.text);
+        if (!data) throw new Error("The model's response for the care guide is empty.");
+        if (data.error) throw new Error(data.error);
+
+        const sanitizedData = sanitizeCareGuide(data);
+        if (!sanitizedData) {
+            throw new Error("Could not process the care guide from the model.");
+        }
+        return sanitizedData;
+    } catch (error) {
+        handleApiError(error);
+        throw new Error("Unhandled error in care guide generation.");
+    }
 };
