@@ -38,21 +38,26 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
   
   // Logic to retrieve the Environment Key safely.
-  // 1. Checks standard process.env.API_KEY (Node/System standard)
-  // 2. Checks import.meta.env.VITE_GEMINI_API_KEY (Vite standard)
+  // We prioritize VITE_GEMINI_API_KEY from import.meta.env as this is the standard way 
+  // for users to provide their own keys in a Vite project (e.g. via .env.local).
   let envApiKey = '';
   try {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      envApiKey = process.env.API_KEY;
-    } else if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+    // 1. Check Vite specific variables first.
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
       envApiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.API_KEY || '';
+    }
+    
+    // 2. If not found in Vite env, check process.env (fallback for system vars or container injection)
+    // Only use this if envApiKey is still empty to ensure user's .env.local takes precedence.
+    if (!envApiKey && typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      envApiKey = process.env.API_KEY;
     }
   } catch (e) {
     // Fail silently if accessing env vars fails
     console.debug("Could not read environment variables directly.");
   }
 
-  // The effective key is the User's manual key if present, otherwise the Environment key.
+  // The effective key is the User's manual key (UI) if present, otherwise the Environment key.
   const effectiveApiKey = userApiKey || envApiKey;
 
   const value: ApiKeyContextState = {
