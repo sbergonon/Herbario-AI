@@ -1,4 +1,3 @@
-
 {
   "appName": "AI Herbarium",
   "identifyPlant": "Identify",
@@ -40,7 +39,8 @@
   "yourApiKeyLabel": "Your Gemini API Key",
   "apiKeyPlaceholder": "Enter your key here",
   "saveAndRetry": "Save and Retry",
-  "clearKey": "Clear Key",
+  "clearKey": "Clear Manual Key",
+  "usingSystemKey": "Using System Key (.env)",
   "getYourApiKey": "You can get your API key from {link}. Your key is stored securely in your browser only.",
   "apiKeyError": "Please set up your API key to continue.",
   "unexpectedError": "An unexpected error occurred.",
@@ -159,5 +159,6 @@
   "unicos": "Unique",
   "unicosPlantaA": "Unique to {plantName}",
   "unicosPlantaB": "Unique to {plantName}",
-  "apariencia": "Appearance"
+  "apariencia": "Appearance",
+  "toggleTheme": "Toggle theme"
 }

@@ -10,7 +10,7 @@ interface ApiKeyModalProps {
 }
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave }) => {
-  const { userApiKey, saveApiKey, clearApiKey, isUserProvided } = useApiKey();
+  const { userApiKey, saveApiKey, clearApiKey, isUserProvided, usingSystemKey } = useApiKey();
   const { t } = useLanguage();
   const [apiKeyInput, setApiKeyInput] = useState('');
 
@@ -29,6 +29,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
   const handleClear = () => {
     clearApiKey();
     setApiKeyInput('');
+    // If we have a system key, clearing the manual key effectively "resets" to the system key
+    // We can trigger a save/retry logic here implicitly or let the user close the modal
+    if (usingSystemKey) {
+        onSave(); // Retry with system key
+    }
   };
 
   const link = `<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">Google AI Studio</a>`;
@@ -52,6 +57,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
           {t('apiKeyModalTitle')}
         </p>
 
+        {usingSystemKey && !userApiKey && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
+                <Icon name="shield" className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                    {t('usingSystemKey') || "Using System/Environment API Key"}
+                </span>
+            </div>
+        )}
+
         <div>
             <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">{t('yourApiKeyLabel')}</label>
             <input 
@@ -60,7 +74,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
               placeholder={t('apiKeyPlaceholder')}
-              className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+              className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 dark:text-slate-200"
             />
         </div>
         

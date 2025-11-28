@@ -1,4 +1,3 @@
-
 {
   "appName": "Herbario IA",
   "identifyPlant": "Identificar",
@@ -40,7 +39,8 @@
   "yourApiKeyLabel": "Tu Clave de API de Gemini",
   "apiKeyPlaceholder": "Introduce tu clave aquí",
   "saveAndRetry": "Guardar y Reintentar",
-  "clearKey": "Borrar Clave",
+  "clearKey": "Borrar Clave Manual",
+  "usingSystemKey": "Usando Clave del Sistema (.env)",
   "getYourApiKey": "Puedes obtener tu clave de API en {link}. Tu clave se guarda de forma segura solo en tu navegador.",
   "apiKeyError": "Por favor, configura tu clave de API para continuar.",
   "unexpectedError": "Ocurrió un error inesperado.",
