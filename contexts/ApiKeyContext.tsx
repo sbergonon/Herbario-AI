@@ -37,7 +37,23 @@ export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUserApiKey(null);
   };
   
-  const effectiveApiKey = userApiKey;
+  // Logic to retrieve the Environment Key safely.
+  // 1. Checks standard process.env.API_KEY (Node/System standard)
+  // 2. Checks import.meta.env.VITE_GEMINI_API_KEY (Vite standard)
+  let envApiKey = '';
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      envApiKey = process.env.API_KEY;
+    } else if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      envApiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.API_KEY || '';
+    }
+  } catch (e) {
+    // Fail silently if accessing env vars fails
+    console.debug("Could not read environment variables directly.");
+  }
+
+  // The effective key is the User's manual key if present, otherwise the Environment key.
+  const effectiveApiKey = userApiKey || envApiKey;
 
   const value: ApiKeyContextState = {
     userApiKey,
